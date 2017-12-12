@@ -1,8 +1,8 @@
 <launch>
 
-	<rosparam command="load" file="/home/kimiwings/workspace/data/bags/stereo/MH01/cam0/sensor.yaml" ns="/cam0"/>
-	<rosparam command="load" file="/home/kimiwings/workspace/data/bags/stereo/MH01/cam1/sensor.yaml" ns="/cam1"/>
-	<rosparam command="load" file="/home/kimiwings/workspace/data/bags/stereo/MH01/imu0/sensor.yaml" ns="/imu"/>
+	<rosparam command="load" file="/home/jiawei/workspace/data/bags/stereo/MH01/cam0/sensor.yaml" ns="/cam0"/>
+	<rosparam command="load" file="/home/jiawei/workspace/data/bags/stereo/MH01/cam1/sensor.yaml" ns="/cam1"/>
+	<rosparam command="load" file="/home/jiawei/workspace/data/bags/stereo/MH01/imu0/sensor.yaml" ns="/imu"/>
 
 	 <node name="manager_node" pkg="direct_stereo" type="manager_node" output="screen" >
 	    <param name="cam0_topic" value="/cam0/image_raw" />

@@ -1,5 +1,5 @@
-#ifndef HELPER_HPP
-#define HELPER_HPP
+#ifndef IMU_MATH_HPP
+#define IMU_MATH_HPP
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>

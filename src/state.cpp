@@ -8,7 +8,7 @@ State::State() {
 	imu_bias.acceleration = Eigen::Vector3d::Zero();
 	imu_bias.rotation = Eigen::Vector3d::Zero();
 
-	variance = Eigen::Matrix<double, 15, 15>::Identity();
+	covariance = Eigen::Matrix<double, 16, 16>::Identity();
 
 	pose_pub = nh.advertise<geometry_msgs::PoseStamped>("cam_pose", 1000);
 }
@@ -16,6 +16,7 @@ State::State() {
 void State::showPose() {
 	std::cout<<"Position: ["<<this->pose.position[0]<<", "<<this->pose.position[1]<<", "<<this->pose.position[2]<<"]"<<std::endl;
 	std::cout<<"Velocity: ["<<this->velocity[0]<<", "<<this->velocity[1]<<", "<<this->velocity[2]<<"]"<<std::endl;
+	std::cout<<"Uncertainty: "<<this->covariance.norm()<<std::endl;
 
 	// publish pose
 	geometry_msgs::PoseStamped pose;

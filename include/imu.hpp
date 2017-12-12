@@ -1,9 +1,12 @@
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+#include "imu_math.hpp"
+#include "state.hpp"
+
 struct IMUModel {
 	Eigen::Matrix4d T_BS;
-	double gyroscope_noise_density;
-	double gyroscope_random_walk;
-	double accelerometer_noise_density;
-	double accelerometer_random_walk;
+	Eigen::Vector3d g;
+	Eigen::Matrix<double,12,12> M;
 };
 
 class State;
@@ -11,7 +14,6 @@ class State;
 class IMU {
 private:
 	IMUModel model;
-	Eigen::Vector3d g;
 	double t_recent;
 public:
 	IMU(std::vector<double> T_BS,

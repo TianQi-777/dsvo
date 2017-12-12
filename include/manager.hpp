@@ -7,6 +7,8 @@
 #include <sensor_msgs/Imu.h>
 
 #include "state.hpp"
+#include "stereo_camera.hpp"
+#include "imu.hpp"
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> StereoSyncPolicy;
 

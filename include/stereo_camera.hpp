@@ -6,10 +6,13 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/video/tracking.hpp>
 #include <pcl_ros/point_cloud.h>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+#include "state.hpp"
+
+#define MAX_FEATURE 200
 
 typedef pcl::PointCloud<pcl::PointXYZ> PCLCloud;
-
-class State;
 
 struct CameraModel {
 	cv::Mat E;
@@ -23,11 +26,13 @@ struct KeyFrame {
     std::vector<cv::Point2f> features0;
     std::vector<unsigned int> active_features0;
 	cv::Mat img1;
+    State state;
 };
 
 struct Frame {
 	cv::Mat img0;
     std::vector<cv::Point2f> features0;
+    State state;
 };
 
 class StereoCamera
@@ -52,5 +57,5 @@ public:
 			     const std::vector<double>& K1, 
 			     const std::vector<double>& frame_size1, 
 			     const std::vector<double>& dist_coeff1);
-	void track(const cv::Mat& cur_img0, const cv::Mat& cur_img1);
+	void track(const cv::Mat& cur_img0, const cv::Mat& cur_img1, State& state);
 };

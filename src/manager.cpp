@@ -79,7 +79,7 @@ void Manager::imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, 
 	img0_ptr->image.copyTo(cur_img0);
 	img1_ptr->image.copyTo(cur_img1);
 
-	stereo_cam->track(cur_img0, cur_img1);
+	stereo_cam->track(cur_img0, cur_img1, state);
 
 	return;
 }

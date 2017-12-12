@@ -1,4 +1,4 @@
-#include "helper.hpp"
+#include "imu_math.hpp"
 #include <math.h>
 #include <iostream>
 Eigen::Quaterniond exp_q(const Eigen::Vector3d& v) {
@@ -41,7 +41,7 @@ Eigen::Matrix4d R_prod(const Eigen::Quaterniond& q) {
 }
 
 Eigen::MatrixXd d_c_R(const Eigen::Vector3d& c) {
-	Eigen::MatrixXd M = Eigen::Matrix<double,3,9>::Identity();
+	Eigen::Matrix<double,3,9> M;
 	double c1 = c[0];
 	double c2 = c[1];
 	double c3 = c[2];
@@ -53,7 +53,7 @@ Eigen::MatrixXd d_c_R(const Eigen::Vector3d& c) {
 }
 
 Eigen::MatrixXd d_R_q(const Eigen::Quaterniond& q) {
-	Eigen::MatrixXd M = Eigen::Matrix<double,9,4>::Identity();
+	Eigen::Matrix<double,9,4> M;
 	double w = q.w();
 	double x = q.x();
 	double y = q.y();
@@ -72,6 +72,9 @@ Eigen::MatrixXd d_R_q(const Eigen::Quaterniond& q) {
 }
 
 Eigen::MatrixXd d_exp_q(const Eigen::Vector3d& x) {
+	// angle is too small
+	if(x.norm() < 10e-3) return Eigen::Matrix<double, 4, 3>::Zero();
+
 	Eigen::Vector3d w = -x/x.norm()*sin(x.norm());
 	Eigen::Matrix3d u = ((x.norm()*Eigen::Matrix3d::Identity()-1/x.norm()*x*x.transpose())/x.norm()/x.norm())*sin(x.norm())
 					+ (1/x.norm()/x.norm()*x*x.transpose())*cos(x.norm());

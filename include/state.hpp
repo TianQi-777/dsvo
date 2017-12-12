@@ -1,7 +1,10 @@
-#include "helper.hpp"
-#include "imu.hpp"
-#include "stereo_camera.hpp"
+#ifndef STATE_H
+#define STATE_H
+
+#include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 
 struct Pose
 {
@@ -15,21 +18,19 @@ struct IMU_bias
 	Eigen::Vector3d rotation;
 };
 
-class State {
-private:
+struct State {
 	// mean
 	Pose pose;
 	Eigen::Vector3d velocity;
 	IMU_bias imu_bias;
 
-	// variance
-	Eigen::Matrix<double, 15, 15> variance;
+	// covariance
+	Eigen::Matrix<double, 16, 16> covariance;
 
-public:
 	State();
-	friend void IMU::imu_propagate(State& state, const Eigen::Vector3d& rot_vel, const Eigen::Vector3d& lin_acc, double d_t);
-
 	ros::NodeHandle nh;
 	ros::Publisher pose_pub;
 	void showPose();
 };
+
+#endif 
