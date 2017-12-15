@@ -10,15 +10,16 @@ IMU::IMU(std::vector<double> T_BS,
 	model.T_BS = Eigen::Matrix4d::Map(&T_BS[0]);
 	// std::cout<<model.T_BS<<std::endl;
 	model.M = Eigen::Matrix<double,12,12>::Zero();
-	model.M.block<3,3>(0,0) = accelerometer_noise_density*Eigen::Matrix3d::Zero();
-	model.M.block<3,3>(3,3) = gyroscope_noise_density*Eigen::Matrix3d::Zero();
-	model.M.block<3,3>(6,6) = accelerometer_random_walk*Eigen::Matrix3d::Zero();
-	model.M.block<3,3>(9,9) = gyroscope_random_walk*Eigen::Matrix3d::Zero();
+	model.M.block<3,3>(0,0) = accelerometer_noise_density*Eigen::Matrix3d::Identity();
+	model.M.block<3,3>(3,3) = gyroscope_noise_density*Eigen::Matrix3d::Identity();
+	model.M.block<3,3>(6,6) = accelerometer_random_walk*Eigen::Matrix3d::Identity();
+	model.M.block<3,3>(9,9) = gyroscope_random_walk*Eigen::Matrix3d::Identity();
 
 	t_recent = -1;
 }
 
 void IMU::imu_propagate(State& state, const Eigen::Vector3d& rot_vel, const Eigen::Vector3d& lin_acc, double t_cur) {
+    // std::cout<<state.covariance<<std::endl<<std::endl;
 	// initialization
 	// std::cout<<rot_vel<<std::endl;
 	if(t_recent<0) {
@@ -70,5 +71,5 @@ void IMU::imu_propagate(State& state, const Eigen::Vector3d& rot_vel, const Eige
 	state.velocity = state.velocity + acc*d_t;
 
 	// show pose
-	state.showPose();
+	// state.showPose();
 }

@@ -2,14 +2,14 @@
 
 Manager::Manager() {
 	ros::NodeHandle nhPriv("~");
-	std::vector<double> E0, K0, frame_size0, dist_coeff0;
-	std::vector<double> E1, K1, frame_size1, dist_coeff1;
+	std::vector<double> T_BS0, K0, frame_size0, dist_coeff0;
+	std::vector<double> T_BS1, K1, frame_size1, dist_coeff1;
 	// cameras model
-	if(!nhPriv.getParam("/cam0/T_BS/data", E0) 
+	if(!nhPriv.getParam("/cam0/T_BS/data", T_BS0) 
 	|| !nhPriv.getParam("/cam0/intrinsics", K0) 
 	|| !nhPriv.getParam("/cam0/resolution", frame_size0) 
 	|| !nhPriv.getParam("/cam0/distortion_coefficients", dist_coeff0)
-	|| !nhPriv.getParam("/cam1/T_BS/data", E1) 
+	|| !nhPriv.getParam("/cam1/T_BS/data", T_BS1) 
 	|| !nhPriv.getParam("/cam1/intrinsics", K1) 
 	|| !nhPriv.getParam("/cam1/resolution", frame_size1) 
 	|| !nhPriv.getParam("/cam1/distortion_coefficients", dist_coeff1) 
@@ -18,8 +18,8 @@ Manager::Manager() {
 		ROS_INFO("Fail to get cameras parameters, exit.");
         return;
 	}
-	stereo_cam = boost::shared_ptr<StereoCamera>(new StereoCamera(E0, K0, frame_size0, dist_coeff0,
-																  E1, K1, frame_size1, dist_coeff1));
+	stereo_cam = boost::shared_ptr<StereoCamera>(new StereoCamera(T_BS0, K0, frame_size0, dist_coeff0,
+																  T_BS1, K1, frame_size1, dist_coeff1));
 
 	// imu model
 	std::vector<double> T_BS;
@@ -79,7 +79,7 @@ void Manager::imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, 
 	img0_ptr->image.copyTo(cur_img0);
 	img1_ptr->image.copyTo(cur_img1);
 
-	stereo_cam->track(cur_img0, cur_img1, state);
+	stereo_cam->stereoTrack(cur_img0, cur_img1, state);
 
 	return;
 }

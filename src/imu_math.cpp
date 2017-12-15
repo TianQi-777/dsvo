@@ -59,29 +59,32 @@ Eigen::MatrixXd d_R_q(const Eigen::Quaterniond& q) {
 	double y = q.y();
 	double z = q.z();
 	M <<    0,    0, -4*y, -4*z,
-		  2*z,  2*y,  2*x,  2*w,
-		 -2*y,  2*z, -2*w,  2*x,
 		 -2*z,  2*y,  2*x, -2*w,
-		    0, -4*x,    0, -4*z,
-		  2*x,  2*w,  2*z,  2*y,
 		  2*y,  2*z,  2*w,  2*x,
+		  2*z,  2*y,  2*x,  2*w,
+		    0, -4*x,    0, -4*z,
 		 -2*x, -2*w,  2*z,  2*y,
+		 -2*y,  2*z, -2*w,  2*x,
+		  2*x,  2*w,  2*z,  2*y,
 		 	0, -4*x, -4*y,	  0; 
+	// M <<    0,    0, -4*y, -4*z,
+	// 	  2*z,  2*y,  2*x,  2*w,
+	// 	 -2*y,  2*z, -2*w,  2*x,
+	// 	 -2*z,  2*y,  2*x, -2*w,
+	// 	    0, -4*x,    0, -4*z,
+	// 	  2*x,  2*w,  2*z,  2*y,
+	// 	  2*y,  2*z,  2*w,  2*x,
+	// 	 -2*x, -2*w,  2*z,  2*y,
+	// 	 	0, -4*x, -4*y,	  0; 
 
 	return M;
 }
 
 Eigen::MatrixXd d_exp_q(const Eigen::Vector3d& x) {
 	// angle is too small
-	if(x.norm() < 10e-3) return Eigen::Matrix<double, 4, 3>::Zero();
-
-	Eigen::Vector3d w = -x/x.norm()*sin(x.norm());
-	Eigen::Matrix3d u = ((x.norm()*Eigen::Matrix3d::Identity()-1/x.norm()*x*x.transpose())/x.norm()/x.norm())*sin(x.norm())
-					+ (1/x.norm()/x.norm()*x*x.transpose())*cos(x.norm());
-
-	Eigen::Matrix<double, 4, 3> M;
-	M.block<1,3>(0,0) = w.transpose();
-	M.block<3,3>(1,0) = u;
-
+	Eigen::Matrix<double, 4, 3> M = Eigen::Matrix<double, 4, 3>::Zero();
+	M(1,0) = 1.0;
+	M(2,1) = 1.0;
+	M(3,2) = 1.0;
 	return M;
 }
