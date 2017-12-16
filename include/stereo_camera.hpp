@@ -5,15 +5,14 @@
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/video/tracking.hpp>
-#include <pcl_ros/point_cloud.h>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <unordered_map>
+#include <queue>
 #include "state.hpp"
 
 #define MAX_FEATURE 200
-
-typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
+#define MAX_FRAME_QUEUE_SIZE 5
 
 struct CameraModel {
 	cv::Mat T_BS;
@@ -45,14 +44,11 @@ private:
 	CameraModel cam1;
 	cv::Mat cR;
 	cv::Mat ct;
-	Frame last_frame;
+	std::queue<Frame> last_frames;
 	KeyFrame last_keyframe;
 	ros::NodeHandle nh;
-	ros::Publisher pcl_pub;
 	int frame_count;
-	void stereoMatch(const cv::Mat& img0, const cv::Mat& img1, std::vector<cv::Point2f>& kp0, std::vector<cv::Point2f>& kp1);
-	void temporalMatch(const cv::Mat& img_kp, const std::vector<cv::Point2f>& kp, const cv::Mat& img0, const cv::Mat& img1, 
-                       std::vector<cv::Point2f>& kp0, std::vector<cv::Point2f>& kp1, std::vector<int>& kp_idx);
+	void stereoMatch(const cv::Mat& img0, const cv::Mat& img1, std::vector<cv::Point3d>& pts, cv::Mat& kp0_dscrpt);
 	void reconstruct3DPts(const std::vector<cv::Point2f>& features0, 
 						  const std::vector<cv::Point2f>& features1, 
 						  std::vector<cv::Point3d>& pts);

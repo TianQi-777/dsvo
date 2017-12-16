@@ -44,8 +44,7 @@ Manager::Manager() {
 	std::string cam0_topic, cam1_topic, imu_topic;
 	if(!nhPriv.getParam("cam0_topic", cam0_topic) 
 	|| !nhPriv.getParam("cam1_topic", cam1_topic) 
-	|| !nhPriv.getParam("imu_topic", imu_topic) 
-    )
+	|| !nhPriv.getParam("imu_topic", imu_topic) )
 	{
 		ROS_INFO("Fail to get sensor topics, exit.");
         return;
@@ -58,6 +57,12 @@ Manager::Manager() {
 	sync->registerCallback(boost::bind(&Manager::imageMessageCallback, this, _1, _2));
 	
 	imu_sub = nh.subscribe(imu_topic, 10, &Manager::imuMessageCallback, this);	
+
+	std::string pos_topic = "";
+	nhPriv.getParam("pos_topic", pos_topic);
+	pos_sub = nh.subscribe(pos_topic, 10, &Manager::posMessageCallback, this);	
+
+	last_pos_set = false;
 }
 
 
@@ -90,3 +95,23 @@ void Manager::imuMessageCallback(const sensor_msgs::ImuConstPtr& imu_cptr) {
 	imu->imu_propagate(state, rot_vel, lin_acc, imu_cptr->header.stamp.toSec());
 }
 
+void Manager::posMessageCallback(const geometry_msgs::PointStampedConstPtr& pos_cptr) {
+	Eigen::Vector4d cur_pos = Eigen::Vector4d(pos_cptr->header.stamp.toSec(),
+			                      				pos_cptr->point.x,
+			                       				pos_cptr->point.y,
+			                       				pos_cptr->point.z);
+	if(last_pos_set) {
+		last_pos = cur_pos;
+		last_pos_set = true;
+		return;
+	}
+
+	double dt = cur_pos(0) - last_pos(0);
+	double dx = cur_pos(1) - last_pos(1);
+	double dy = cur_pos(2) - last_pos(2);
+	double dz = cur_pos(3) - last_pos(3);
+
+	std::cout<<"True Velocity: ["<<dx/dt<<", "<<dy/dt<<", "<<dz/dt<<"]"<<std::endl;
+
+	last_pos = cur_pos;
+}	

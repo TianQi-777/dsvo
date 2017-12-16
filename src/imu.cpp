@@ -19,7 +19,7 @@ IMU::IMU(std::vector<double> T_BS,
 }
 
 void IMU::imu_propagate(State& state, const Eigen::Vector3d& rot_vel, const Eigen::Vector3d& lin_acc, double t_cur) {
-    // std::cout<<state.covariance<<std::endl<<std::endl;
+    std::cout<<"Propagating... "<<std::endl<<std::endl;
 	// initialization
 	// std::cout<<rot_vel<<std::endl;
 	if(t_recent<0) {
@@ -41,8 +41,8 @@ void IMU::imu_propagate(State& state, const Eigen::Vector3d& rot_vel, const Eige
 	Eigen::Vector3d c2 = (lin_acc-state.imu_bias.acceleration)*d_t;
 	Eigen::MatrixXd d_p_q = d_c_R(c1)*d_R_q(state.pose.orientation);
 	Eigen::MatrixXd d_v_q = d_c_R(c2)*d_R_q(state.pose.orientation);
-
-	Eigen::Matrix<double, 16, 16> G = Eigen::Matrix<double, 16, 16>::Identity();
+	
+	Eigen::MatrixXd G = Eigen::Matrix<double, 16, 16>::Identity();
 	G.block<3,4>(0,3) = d_p_q;
 	G.block<3,3>(0,7) = d_t*Eigen::Matrix3d::Identity();
 	G.block<3,3>(0,10) = -0.5*d_t*d_t*R;
@@ -52,7 +52,7 @@ void IMU::imu_propagate(State& state, const Eigen::Vector3d& rot_vel, const Eige
 	G.block<3,3>(7,10) = -R*d_t;
 // std::cout<<G<<std::endl;
 
-	Eigen::Matrix<double, 16, 12> V = Eigen::Matrix<double,16,12>::Zero();
+	Eigen::MatrixXd V = Eigen::Matrix<double, 16,12>::Zero();
 	V.block<3,3>(0,0) = -G.block<3,3>(0,10);
 	V.block<3,3>(0,6) = G.block<3,3>(0,10);
 	V.block<4,3>(3,3) = -G.block<4,3>(3,13);
@@ -61,15 +61,18 @@ void IMU::imu_propagate(State& state, const Eigen::Vector3d& rot_vel, const Eige
 	V.block<3,3>(7,6) = G.block<3,3>(7,10);
 	V.block<3,3>(10,6) = Eigen::Matrix3d::Identity();
 	V.block<3,3>(13,9) = Eigen::Matrix3d::Identity();
-// std::cout<<V<<std::endl;
-	state.covariance = G*state.covariance*G.transpose() + V*model.M*V.transpose();
+
+	Eigen::MatrixXd trunked_cov = state.covariance.block<16,16>(0,0);
+	trunked_cov = G*trunked_cov*G.transpose() + V*model.M*V.transpose();
+	state.covariance.block<16,16>(0,0) = trunked_cov;
 
 
 	// propagation 
-	state.pose.position = state.pose.position + state.velocity*d_t + 0.5*acc*d_t*d_t;
+	// state.pose.position = state.pose.position + state.velocity*d_t + 0.5*acc*d_t*d_t;
 	state.pose.orientation = state.pose.orientation*exp_q((rot_vel-state.imu_bias.rotation)*d_t/2);
 	state.velocity = state.velocity + acc*d_t;
 
 	// show pose
-	// state.showPose();
+	state.showPose();
+    std::cout<<"Propagating end "<<std::endl<<std::endl;
 }
