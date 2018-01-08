@@ -18,7 +18,7 @@ include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS})
 
 include_directories(include)
 
-add_executable(manager_node src/manager_node.cpp src/manager.cpp src/state.cpp src/imu.cpp src/stereo_camera.cpp src/imu_math.cpp)
+add_executable(manager_node src/manager_node.cpp src/manager.cpp src/stereo_camera.cpp)
 target_link_libraries(manager_node 
 	${catkin_LIBRARIES}
 	${OpenCV_LIBS}

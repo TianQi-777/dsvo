@@ -1,37 +1,34 @@
 #include "stereo_camera.hpp"
+#define PI 3.1415926
 
-StereoCamera::StereoCamera(const std::vector<double>& T_BS0, 
+
+StereoCamera::StereoCamera(const std::vector<double>& E0, 
 						   const std::vector<double>& K0, 
 						   const std::vector<double>& frame_size0, 
 						   const std::vector<double>& dist_coeff0,
-						   const std::vector<double>& T_BS1, 
+						   const std::vector<double>& E1, 
 						   const std::vector<double>& K1, 
 						   const std::vector<double>& frame_size1, 
 						   const std::vector<double>& dist_coeff1) {
-	cam0.T_BS = cv::Mat::zeros(4,4,CV_64F);
-    for(int i=0; i<4; i++) {
-        for(int j=0; j<4; j++) {
-            cam0.T_BS.at<double>(i,j) = T_BS0[i*4+j];
-        }
-    }
+	cam0.E = cv::Mat(E0);
+	cam0.E = cam0.E.reshape(0,4);
+	cv::Mat R0(cam0.E, cv::Rect(0,0,3,3));
+	cv::Mat t0 = cam0.E(cv::Rect(3,0,1,3));
 
 	cam0.K = cv::Mat::zeros(3,3,CV_64F);
 	cam0.K.at<double>(0,0) = K0[0];
 	cam0.K.at<double>(1,1) = K0[1];
 	cam0.K.at<double>(0,2) = K0[2];
 	cam0.K.at<double>(1,2) = K0[3];
-    cam0.K.at<double>(2,2) = 1.0;
 
 	cam0.frame_size = cv::Size(frame_size0[0], frame_size0[1]);
 
 	cam0.dist_coeff= cv::Mat(dist_coeff0);
 
-	cam1.T_BS = cv::Mat::zeros(4,4,CV_64F);
-    for(int i=0; i<4; i++) {
-        for(int j=0; j<4; j++) {
-            cam1.T_BS.at<double>(i,j) = T_BS1[i*4+j];
-        }
-    }
+	cam1.E = cv::Mat(E1);
+	cam1.E = cam1.E.reshape(0,4);
+	cv::Mat R1 = cam1.E(cv::Rect(0,0,3,3));
+	cv::Mat t1 = cam1.E(cv::Rect(3,0,1,3));
 
 	cam1.K = cv::Mat::zeros(3,3,CV_64F);
 	cam1.K.at<double>(0,0) = K1[0];
@@ -43,40 +40,30 @@ StereoCamera::StereoCamera(const std::vector<double>& T_BS0,
 
 	cam1.dist_coeff= cv::Mat(dist_coeff1);
 
-    cv::Mat R0 = cam0.T_BS(cv::Rect(0,0,3,3));
-    cv::Mat t0 = cam0.T_BS(cv::Rect(3,0,1,3));
-    cv::Mat R1 = cam1.T_BS(cv::Rect(0,0,3,3));
-    cv::Mat t1 = cam1.T_BS(cv::Rect(3,0,1,3));
-    cv::Mat R0_T;
-    cv::transpose(R0, R0_T);
-    cR = R1*R0_T;
-    ct = R1*(t1-t0);
+	
+	cv::Mat R1T;
+	cv::transpose(R1, R1T);
+	R01 = R1T * R0;
+	t01 = R1T * (t0 - t1);
 
-    frame_count = 0;
-}
+	// std::cout<<t01<<std::endl;
 
-void dscrpt_match(const cv::Mat& dscrpt0, const cv::Mat& dscrpt1, std::vector<std::pair<int, int> >& matches) {
-    if(dscrpt0.cols != dscrpt1.cols) return;
-    std::vector<std::vector<cv::DMatch> > lr_matches;
-    cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
-    matcher->knnMatch(dscrpt0, dscrpt1, lr_matches, 2);
-
-    for(unsigned int i=0; i<lr_matches.size(); i++) {
-        if(float(lr_matches[i][0].distance) < 0.7*float(lr_matches[i][1].distance))
-        {
-            matches.push_back({lr_matches[i][0].queryIdx, lr_matches[i][0].trainIdx});
-        }
-    }
+    pose_pub = nh.advertise<geometry_msgs::PoseStamped>("cam_pose", 1000);
+	new_keyframe_required = true;
 }
 
 void StereoCamera::reconstruct3DPts(const std::vector<cv::Point2f>& features0, 
 									   const std::vector<cv::Point2f>& features1, 
+									   const cv::Mat& R, 
+									   const cv::Mat& t, 
 									   std::vector<cv::Point3d>& pts){
 	//get perspective projection matrix
     cv::Mat Pl, Pr;
     Pl = cam0.K*(cv::Mat_<double>(3,4) <<1,0,0,0,0,1,0,0,0,0,1,0);
-    cv::hconcat(cR, ct, Pr);
+    cv::hconcat(R, t, Pr);
     Pr = cam0.K*Pr;
+
+    PCLCloud::Ptr point_cloud (new PCLCloud);
 
     //reconstruct 3d feature points
     for(unsigned int i=0; i<features0.size(); i++) {
@@ -93,312 +80,205 @@ void StereoCamera::reconstruct3DPts(const std::vector<cv::Point2f>& features0,
         cv::SVDecomp(A, W, U, V, cv::SVD::FULL_UV);
         cv::transpose(V,V);
 
-        double cx = V.at<double>(0,3) / V.at<double>(3,3);
-        double cy = V.at<double>(1,3) / V.at<double>(3,3);
-        double cz = V.at<double>(2,3) / V.at<double>(3,3);
-
-        cv::Mat pt_c = (cv::Mat_<double>(4,1) << cx, cy, cz, 1.0);
-        cv::Mat pt_w = cam0.T_BS.inv() * pt_c;
-
-        double x = pt_w.at<double>(0,0) / pt_w.at<double>(3,0);
-        double y = pt_w.at<double>(1,0) / pt_w.at<double>(3,0);
-        double z = pt_w.at<double>(2,0) / pt_w.at<double>(3,0);
+        double x = V.at<double>(0,3) / V.at<double>(3,3);
+        double y = V.at<double>(1,3) / V.at<double>(3,3);
+        double z = V.at<double>(2,3) / V.at<double>(3,3);
   
-  // std::cout<<cx<<" , "<<cy<<" , "<<cz<<std::endl;
-
         pts.push_back(cv::Point3d(x,y,z));
-    }
-}
 
-void StereoCamera::stereoMatch(const cv::Mat& img0, const cv::Mat& img1, std::vector<cv::Point3d>& pts, cv::Mat& kp0_dscrpt) {
-    std::vector<cv::KeyPoint> _kp0, _kp1;
-    cv::Ptr<cv::ORB> detector = cv::ORB::create();
-    // cv::goodFeaturesToTrack(img0, features0, MAX_FEATURE, 0.01, 5);
-    // cv::goodFeaturesToTrack(img1, features1, MAX_FEATURE, 0.01, 5);
-    detector->detect(img0, _kp0);
-    detector->detect(img1, _kp1);
-
-    cv::Mat dscrpt0, dscrpt1;
-    detector->compute(img0, _kp0, dscrpt0);
-    detector->compute(img1, _kp1, dscrpt1);
-    assert(_kp0.size()==dscrpt0.rows && _kp1.size()==dscrpt1.rows);
-
-    std::vector<std::pair<int, int> > matches;
-    dscrpt_match(dscrpt0, dscrpt1, matches);
-
-    std::vector<cv::Point2f> kp0, kp1;
-    kp0_dscrpt.release();
-    for(size_t i=0; i<matches.size(); i++)
-    {
-        double dy = _kp0[matches[i].first].pt.y - _kp1[matches[i].second].pt.y;
-        // if(dy*dy < 25.0) 
+        // if(fabs(x) < 100.0 && fabs(y) < 100.0 && fabs(z) < 100.0)
         {
-            kp0.push_back(_kp0[matches[i].first].pt);
-            kp1.push_back(_kp1[matches[i].second].pt);
-            if(kp0_dscrpt.empty()) {
-                kp0_dscrpt = dscrpt0.row(matches[i].first);
-            } else {
-                cv::vconcat(kp0_dscrpt, dscrpt0.row(matches[i].first), kp0_dscrpt);
-            }
+            pcl::PointXYZ p;
+            p.x = x;
+            p.y = y;
+            p.z = z;
+            point_cloud->push_back(p);
         }
     }
-    
-    cv::Mat stereo_match;
-    cv::hconcat(img0, img1, stereo_match);
-    for(int i=0; i<kp0.size(); i++) {
-        cv::line(stereo_match, kp0[i], cv::Point2f(kp1[i].x+img0.cols,kp1[i].y), cv::Scalar(255,0,0));
-    }
-    cv::imshow("Stereo match", stereo_match);
-    cv::waitKey(1);
 
-    // construct 3D pts
-    reconstruct3DPts(kp0, kp1, pts);
+    point_cloud->header.frame_id = "/map";
+    // pcl_pub.publish(point_cloud);
 }
 
-void StereoCamera::stereoTrack(const cv::Mat& cur_img0, const cv::Mat& cur_img1, State& state) {
-    std::cout<<"Updating... "<<std::endl<<std::endl;
-    // get current pts and descriptor
-    std::vector<cv::Point3d> cur_pts;
-    cv::Mat cur_dscrt;
-    stereoMatch(cur_img0, cur_img1, cur_pts, cur_dscrt);
-    // find correspondence
-    std::vector<std::pair<int, int> > matches;
-    dscrpt_match(cur_dscrt, state.landmarks_dscrt, matches);
-    std::cout<<"Match size "<<matches.size()<<std::endl;
 
-    // initalize keyframe
+float monoTrack(const cv::Mat& last_frame_img, std::vector<cv::Point2f>& last_frame_features, 
+	                         const cv::Mat& last_keyframe_img, std::vector<cv::Point2f>& last_keyframe_features, 
+	                         const cv::Mat& cur_img, std::vector<cv::Point2f>& cur_features, 
+	                         const cv::Mat& K, cv::Mat& line_img, cv::Mat& R, cv::Mat& t) {
+	R = cv::Mat::eye(3,3,CV_64F);
+	t = cv::Mat::zeros(3,1,CV_64F);
+    cv::hconcat(last_keyframe_img, cur_img, line_img);
+    // filter matches
+    std::vector<cv::Point2f> last_keyframe_features_inlier, last_frame_features_inlier, cur_features_inlier;
 
-    // get relative pose R t
-    Eigen::Vector3d cur_pos = state.pose.position;
-    Eigen::Matrix3d cur_R = state.pose.orientation.toRotationMatrix();
-    if(state.landmarks_dscrt.empty()) {
-        std::cout<<"Adding new landmarks... "<<std::endl<<std::endl;
+    std::vector<uchar> status;
+    std::vector<float> err;
+	if(last_keyframe_features.size() < 10) {
+		last_keyframe_features.clear();
+		return 0.0;
+	}
+    cv::calcOpticalFlowPyrLK(last_frame_img, cur_img, last_frame_features, cur_features, status, err);
+    for(int i=0; i<status.size(); i++){
+    	if(!status[i] || cv::norm(last_frame_features[i]-cur_features[i]) > 25) continue;
 
-        // a([R]) / a(orientation)
-        double w = state.pose.orientation.w();
-        double x = state.pose.orientation.x();
-        double y = state.pose.orientation.y();
-        double z = state.pose.orientation.z();
-        Eigen::Matrix<double,9,4> aR_aq;
-        aR_aq <<    0,    0, -4*y, -4*z,
-                 -2*z,  2*y,  2*x, -2*w,
-                  2*y,  2*z,  2*w,  2*x,
-                  2*z,  2*y,  2*x,  2*w,
-                    0, -4*x,    0, -4*z,
-                 -2*x, -2*w,  2*z,  2*y,
-                 -2*y,  2*z, -2*w,  2*x,
-                  2*x,  2*w,  2*z,  2*y,
-                    0, -4*x, -4*y,    0; 
+    	last_keyframe_features_inlier.push_back(last_keyframe_features[i]);
+    	last_frame_features_inlier.push_back(last_frame_features[i]);
+    	cur_features_inlier.push_back(cur_features[i]);
+    	cv::line(line_img, last_keyframe_features[i], cv::Point2f(cur_features[i].x+last_keyframe_img.cols, cur_features[i].y), cv::Scalar(255,0,0));
+    } 
 
-        // update covariance
-        state.covariance.conservativeResize(16+3*cur_pts.size(), 16+3*cur_pts.size());
+    last_keyframe_features = last_keyframe_features_inlier; last_keyframe_features_inlier.clear();
+	last_frame_features = last_frame_features_inlier; last_frame_features_inlier.clear();
+	cur_features = cur_features_inlier;
 
-        for(int i=0; i<cur_pts.size(); i++) {
+	if(last_keyframe_features.size() < 10) {
+		last_keyframe_features.clear();
+		return 0.0;
+	}
 
-            // add new landmark
-            Eigen::Vector3d pt_w = cur_R.transpose() * Eigen::Vector3d(cur_pts[i].x,cur_pts[i].y,cur_pts[i].z) + cur_pos;
-            state.landmarks.push_back(cv::Point3d(pt_w(0),pt_w(1),pt_w(2)));
-  
-            if(state.landmarks_dscrt.empty()) {
-                state.landmarks_dscrt = cur_dscrt.row(i);
-            } else {
-                cv::vconcat(state.landmarks_dscrt, cur_dscrt.row(i), state.landmarks_dscrt);
-            }
+    //recover pose
+    cv::Mat inlier_mask, Est;
+    Est  = cv::findEssentialMat(last_keyframe_features, cur_features, K, cv::RANSAC, 0.99, 1.0, inlier_mask);
+    int inlier_count = cv::recoverPose(Est, last_keyframe_features, cur_features, K, R, t, inlier_mask);
 
-            // a(pt_w) / a(position)
-            Eigen::Matrix3d aptw_apos = Eigen::Matrix3d::Identity();
+    // std::cout<<"ratio: "<<inlier_count / float(last_keyframe_features.size())<<std::endl;
+    return inlier_count / float(last_keyframe_features.size()); 
 
-            // a(pt_w) / a([R])
-            Eigen::Matrix<double,3,9> aptw_aR;
-            aptw_aR <<cur_pts[i].x, 0, 0, cur_pts[i].y, 0, 0, cur_pts[i].z, 0, 0,
-                      0, cur_pts[i].x, 0, 0, cur_pts[i].y, 0, 0, cur_pts[i].z, 0,
-                      0, 0, cur_pts[i].x, 0, 0, cur_pts[i].y, 0, 0, cur_pts[i].z;
+ //    for(unsigned int i=0; i<cur_features.size(); i++) {
+ //        if(inlier_mask.at<uchar>(i,0)>0) {
+	//     	last_keyframe_features_inlier.push_back(last_keyframe_features[i]);
+	//     	last_frame_features_inlier.push_back(last_frame_features[i]);
+ //        }
+ //    }
 
-            // a(pt_w) / a(orientation)
-            Eigen::MatrixXd aptw_aq = aptw_aR * aR_aq;
+ //    last_keyframe_features = last_keyframe_features_inlier; last_keyframe_features_inlier.clear();
+	// last_frame_features = last_frame_features_inlier; last_frame_features_inlier.clear();
+	// cur_features = cur_features_inlier;
+}
 
-            // H_R = [a(pt_w) / a(position) , a(pt_w) / a(orientation) , 0 , 0 , 0, ..., 0]
-            Eigen::MatrixXd H_R = Eigen::Matrix<double, 3, 16>::Zero();
-            H_R.block<3,3>(0,0) = aptw_apos;
-            H_R.block<3,4>(0,3) = aptw_aq;
+KeyFrame StereoCamera::createKeyFrame(const cv::Mat& cur_img0, const cv::Mat& cur_img1, const Eigen::Matrix3d& R, const Eigen::Vector3d& t){
+	std::cout<<"New KeyFrame"<<std::endl;
+	KeyFrame keyframe = KeyFrame();
 
-            // H_Li = a(pt_w) / a(zm)
-            Eigen::MatrixXd H_Li = cur_R.transpose();
+	keyframe.R = R;
+	keyframe.t = t;
 
-            // estimate error
-            Eigen::Vector3d R_d;
-            double dcx = cur_pts[i].x;
-            double dcy = cur_pts[i].y;
-            double dcz = cur_pts[i].z;
-            R_d << sqrt(dcx*dcx), sqrt(dcy*dcy), sqrt(dcz*dcz);
-            // R_d << 0.01*sqrt(cur_pts[i].x * cur_pts[i].x),
-            //        0.01*sqrt(cur_pts[i].y * cur_pts[i].y),
-            //        0.01*sqrt(cur_pts[i].z * cur_pts[i].z);
-            Eigen::Matrix3d R = 4*R_d.asDiagonal();
+	keyframe.img0 = cur_img0.clone();
+	keyframe.img1 = cur_img1.clone();
 
-            Eigen::MatrixXd _HHP = -H_Li.transpose()*H_R*state.covariance.block(0,0,16,16+3*i);
-            Eigen::MatrixXd HHPH_RH = H_Li.transpose()*(H_R*state.covariance.block<16,16>(0,0)*H_R.transpose() + R)*H_Li;
-            state.covariance.block(16+3*i,0,3,16+3*i) = _HHP;
-            state.covariance.block(0,16+3*i,16+3*i,3) = _HHP.transpose();
-            state.covariance.block<3,3>(16+3*i,16+3*i) = HHPH_RH;
-        }
-        std::cout<<"Adding new landmarks end "<<std::endl<<std::endl;
+    // detect feature points
+    cv::goodFeaturesToTrack(keyframe.img0, keyframe.features0, 500, 0.01, 5);
+    keyframe.init_feature0_count = keyframe.features0.size();
+    cv::goodFeaturesToTrack(keyframe.img1, keyframe.features1, 500, 0.01, 5);
+    keyframe.init_feature1_count = keyframe.features1.size();
+
+    // publish pose
+    geometry_msgs::PoseStamped pose;
+
+    pose.header.frame_id = "/map";
+
+    pose.pose.position.x = t[2];
+    pose.pose.position.y = t[0];
+    pose.pose.position.z = t[1];
+
+    // pose.pose.position.x = 0;
+    // pose.pose.position.y = 0;
+    // pose.pose.position.z = 0;
+
+    Eigen::Quaterniond q(R);
+    pose.pose.orientation.w = q.w(); 
+    pose.pose.orientation.x = q.z();
+    pose.pose.orientation.y = q.x();
+    pose.pose.orientation.z = q.y();
+
+    pose_pub.publish(pose);
+
+    return keyframe;
+}
+
+void StereoCamera::track(const cv::Mat& cur_img0, const cv::Mat& cur_img1) {
+	//initialize key_frame
+    if(keyframes.empty() || keyframes.back().features0.size() < 10) {
+    	KeyFrame keyframe;
+    	if(keyframes.empty())
+	    	keyframe = createKeyFrame(cur_img0, cur_img1, Eigen::Matrix3d::Identity(), Eigen::Vector3d(0,0,0));
+	    else
+	    	keyframe = createKeyFrame(cur_img0, cur_img1, keyframes.back().R, keyframes.back().t);
+
+	    last_frame.img0 = keyframe.img0.clone(); 
+	    last_frame.img1 = keyframe.img1.clone(); 
+	    last_frame.features0 = keyframe.features0;
+	    last_frame.features1 = keyframe.features1;
+
+	    keyframes.push_back(keyframe);
+	    new_keyframe_required = false;
+
+    	return;
     }
 
-        
-    if(matches.size() >= 4) {
-        Eigen::MatrixXd A;
-        Eigen::VectorXd b;
-        A.resize(3*matches.size(), 12);
-        b.resize(3*matches.size());
-        A.setZero();
-        b.setZero();
-        for (int i=0; i<matches.size(); i++) {   
-            double landmark_x = state.landmarks[matches[i].second].x;
-            double landmark_y = state.landmarks[matches[i].second].y;
-            double landmark_z = state.landmarks[matches[i].second].z;
-            A(3*i, 0) = landmark_x; A(3*i, 1) = landmark_y; A(3*i, 2) = landmark_z;
-            A(3*i+1, 3) = landmark_x; A(3*i+1, 4) = landmark_y; A(3*i+1, 5) = landmark_z;
-            A(3*i+2, 6) = landmark_x; A(3*i+2, 7) = landmark_y; A(3*i+2, 8) = landmark_z;
-            A(3*i, 9) = 1; A(3*i+1, 10) = 1; A(3*i+2, 11) = 1;
-             
-            b(3*i) = cur_pts[matches[i].first].x;
-            b(3*i+1) = cur_pts[matches[i].first].y;
-            b(3*i+2) = cur_pts[matches[i].first].z;
-        }
+    KeyFrame& last_keyframe = keyframes.back();
 
-        Eigen::MatrixXd ATA = A.transpose()*A;
-        Eigen::VectorXd ps = ATA.inverse() * A.transpose() * b;
-        Eigen::Matrix3d _R;
-        Eigen::Vector3d _t;
-        _R << ps(0), ps(1), ps(2),
-              ps(3), ps(4), ps(5),
-              ps(6), ps(7), ps(8);
-        _t << ps(9), ps(10), ps(11);
-        Eigen::AngleAxisd newAngleAxis(_R);
-        double angle = newAngleAxis.angle();
-        std::cout<<"Angle "<<angle/3.14159*180.0<<std::endl;
-    }
-
-    std::vector<bool> cur_pts_updated(cur_pts.size(), false);
-
-    Eigen::MatrixXd I;
-    I.resize(16+3*state.landmarks.size(), 16+3*state.landmarks.size());
-    I.setIdentity();
-    // Kalman filter update pt by pt
-    for (int i=0; i<matches.size(); i++) {   
-
-        // construct pts from landmark
-        double landmark_x = state.landmarks[matches[i].second].x;
-        double landmark_y = state.landmarks[matches[i].second].y;
-        double landmark_z = state.landmarks[matches[i].second].z;
-        Eigen::Vector3d landmark_w;
-        landmark_w << landmark_x, landmark_y, landmark_z; 
-        Eigen::Vector3d zc = cur_R * (landmark_w - cur_pos);
-
-        // measurement
-        Eigen::Vector3d zm;
-        zm << cur_pts[matches[i].first].x,
-              cur_pts[matches[i].first].y,
-              cur_pts[matches[i].first].z;
-        cur_pts_updated[matches[i].first] = true;
-
-        // a(zc) / a(position)
-        Eigen::MatrixXd azc_ap = -cur_R;
-
-        // a(zc) / a(landmark)
-        Eigen::MatrixXd azc_almk = cur_R;
-
-        // a(zc) / a([R])
-        Eigen::Matrix<double,3,9> azc_aR;
-        Eigen::Vector3d landmark_pos = landmark_w - cur_pos;
-        azc_aR << landmark_pos(0), landmark_pos(1), landmark_pos(2), 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, landmark_pos(0), landmark_pos(1), landmark_pos(2), 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, landmark_pos(0), landmark_pos(1), landmark_pos(2);
-
-        // a([R]) / a(orientation)
-        double w = state.pose.orientation.w();
-        double x = state.pose.orientation.x();
-        double y = state.pose.orientation.y();
-        double z = state.pose.orientation.z();
-        Eigen::Matrix<double,9,4> aR_aq;
-        aR_aq <<    0,    0, -4*y, -4*z,
-                    -2*z,  2*y,  2*x, -2*w,
-                     2*y,  2*z,  2*w,  2*x,
-                     2*z,  2*y,  2*x,  2*w,
-                       0, -4*x,    0, -4*z,
-                    -2*x, -2*w,  2*z,  2*y,
-                    -2*y,  2*z, -2*w,  2*x,
-                     2*x,  2*w,  2*z,  2*y,
-                       0, -4*x, -4*y,    0; 
-        // aR_aq <<    0,    0, -4*y, -4*z,
-        //       2*z,  2*y,  2*x,  2*w,
-        //      -2*y,  2*z, -2*w,  2*x,
-        //      -2*z,  2*y,  2*x, -2*w,
-        //         0, -4*x,    0, -4*z,
-        //       2*x,  2*w,  2*z,  2*y,
-        //       2*y,  2*z,  2*w,  2*x,
-        //      -2*x, -2*w,  2*z,  2*y,
-        //         0, -4*x, -4*y,    0; 
-
-        // a(zc) / a(orientation)
-        Eigen::MatrixXd azc_aq = azc_aR * aR_aq;
-
-        // H = [(zc) / a(position) , a(zc) / a(orientation) , 0 , 0 , 0, ..., 0, a(zc) / a(landmark), 0, ..., 0]
-        Eigen::MatrixXd H;
-        H.resize(3, 16+3*state.landmarks.size());
-        H.setZero();
-        H.block(0,0,3,3) = azc_ap;
-        H.block(0,4,3,4) = azc_aq;
-        H.block(0,16+3*matches[i].second,3,3) = azc_almk;
-
-        // estimate error
-        Eigen::Vector3d Q_d;
-        double dzx = zm(0) - zc(0);
-        double dzy = zm(1) - zc(1);
-        double dzz = zm(2) - zc(2);
-        Q_d << sqrt(dzx*dzx), sqrt(dzy*dzy), sqrt(dzz*dzz);
-        // Q_d << 0.01*sqrt(cur_pts[i].x * cur_pts[i].x),
-        //        0.01*sqrt(cur_pts[i].y * cur_pts[i].y),
-        //        0.01*sqrt(cur_pts[i].z * cur_pts[i].z);
-        Eigen::Matrix3d Q = 4*Q_d.asDiagonal();
-        // Eigen::Matrix3d Q = 0.0000*Eigen::Matrix3d::Identity();
+	cv::Mat line_img0, line_img1, R0, t0, R1, t1;
+    cv::Vec3d r_vec0, r_vec1;
+	std::vector<cv::Point2f> cur_features0, cur_features1;
+	float track0 = monoTrack(last_frame.img0, last_frame.features0, last_keyframe.img0, last_keyframe.features0, cur_img0, cur_features0, cam0.K, line_img0, R0, t0);
+	float track1 = monoTrack(last_frame.img1, last_frame.features1, last_keyframe.img1, last_keyframe.features1, cur_img1, cur_features1, cam1.K, line_img1, R1, t1);
+	cv::imshow("Left temp match", line_img0);
+    cv::waitKey(1); 
+	cv::imshow("Right temp match", line_img1);
+    cv::waitKey(1); 
+	// if (track0<0.3	|| !track1<0.3) {
+		// R0 = cv::Mat::eye(3,3,CV_64F);
+		// t0 = cv::Mat::zeros(3,1,CV_64F);
+		// R1 = cv::Mat::eye(3,3,CV_64F);
+		// t1 = cv::Mat::zeros(3,1,CV_64F);
+		// std::cout<<"drop frame"<<std::endl;
+    	// new_keyframe_required = true;
+    // } else {
 
 
-        // Kalman filter update
-        Eigen::MatrixXd S = H*state.covariance*H.transpose() + Q;
-        S = (S + S.transpose()) / 2;
-        Eigen::MatrixXd K = state.covariance*H.transpose()*S.inverse();
-        Eigen::VectorXd d_state = K*(zm-zc);
-        // std::cout<<d_state<<std::endl<<std::endl;
-        // std::cout<<zm<<std::endl<<std::endl<<zc<<std::endl<<std::endl<<std::endl<<std::endl;
-        state.pose.position += d_state.segment<3>(0);
-        state.pose.orientation.w() += d_state(3);
-        state.pose.orientation.x() += d_state(4);
-        state.pose.orientation.y() += d_state(5);
-        state.pose.orientation.z() += d_state(6);
-        double quat_scale = state.pose.orientation.norm();
-        state.pose.orientation.normalize();
-        state.velocity += d_state.segment<3>(7);
-        state.imu_bias.acceleration += d_state.segment<3>(10);
-        state.imu_bias.rotation += d_state.segment<3>(13);
-        state.landmarks[matches[i].second].x += d_state(16+3*matches[i].second+0);
-        state.landmarks[matches[i].second].y += d_state(16+3*matches[i].second+1);
-        state.landmarks[matches[i].second].z += d_state(16+3*matches[i].second+2);
-        state.covariance = (I - K*H)*state.covariance;
-        // normalize covariance w.r.t. quatertion scale
-        Eigen::MatrixXd J = I;
-        J.block<4,4>(3,3) = 1.0/quat_scale*Eigen::Matrix4d::Identity();
-        state.covariance = J * state.covariance * J.transpose();
+    // update last_frame
+	last_frame.img0 = cur_img0.clone();
+	last_frame.features0 = cur_features0;
+	last_frame.img1 = cur_img1.clone();
+	last_frame.features1 = cur_features1;
 
+	if (track0>0.5 && track1>0.5) {
+    	std::cout<<"track frame"<<std::endl;
 
-    }
-    std::cout<<"Updating end "<<std::endl<<std::endl;
+	    cv::Rodrigues(R0, r_vec0);
+	    cv::Rodrigues(R1, r_vec1);
+	    if(cv::norm(r_vec0) > PI/30.0) // far enough
+	    {  
+			// A[lambda_0, lambda_1] = b
+			cv::Mat b = R1*t01 - t01;
+			cv::Mat A;
+			cv::hconcat(R01*t0, -t1, A);
 
+			cv::Mat AT, ATA, ATA_1;
+			transpose(A, AT);
+			ATA = AT * A;
+			ATA_1 = ATA.inv();
 
-    // show pose
-    state.showPose();
+			cv::Mat lambda = ATA_1*AT*b;
 
-    return;
+			// std::cout<<lambda.type()<<std::endl;
+			t0 = lambda.at<double>(0,0) * t0;
 
+			Eigen::Matrix3d R0_eigen;
+			Eigen::Vector3d t0_eigen;
+			cv::cv2eigen(R0, R0_eigen);
+			cv::cv2eigen(t0, t0_eigen);
+	        Eigen::Vector3d cur_t = R0_eigen*last_keyframe.t + t0_eigen;
+	        Eigen::Matrix3d cur_R  = R0_eigen*last_keyframe.R;
+			KeyFrame keyframe = createKeyFrame(cur_img0, cur_img1, cur_R, cur_t);
+		    last_frame.img0 = keyframe.img0.clone(); 
+		    last_frame.img1 = keyframe.img1.clone(); 
+		    last_frame.features0 = keyframe.features0;
+		    last_frame.features1 = keyframe.features1;
+
+		    keyframes.push_back(keyframe);
+		    new_keyframe_required = false;
+		}
+ 	}
 }
