@@ -11,7 +11,6 @@
 #include <pcl_ros/point_cloud.h>
 #include <geometry_msgs/PoseStamped.h>
 #include "state.hpp"
-#include "directSolver.h"
 
 
 typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
@@ -60,7 +59,7 @@ private:
 	Eigen::Isometry3d T_cam0_BS_inv;
 	Frame last_frame;
 	std::vector<KeyFrame> keyframes;
-	shared_ptr<DirectSolver> directSolver_ptr;
+	// shared_ptr<DirectSolver> directSolver_ptr;
 	KeyFrame createKeyFrame(const Pose& cur_pose, const cv::Mat& cur_img0, const cv::Mat& cur_img1, double cur_time);
 	void reconstruct3DPts(const std::vector<cv::Point2f>& features0, 
 						  const std::vector<cv::Point2f>& features1, 
@@ -72,8 +71,8 @@ private:
 	                         const cv::Mat& cur_img, std::vector<cv::Point2f>& cur_features, 
 	                         const cv::Mat& K, cv::Mat& line_img, cv::Mat& R, cv::Mat& t, cv::Mat& inlier_mask);
 	void optimize(const std::vector<cv::Point2f>& _last_keyframe_features0, const std::vector<cv::Point2f>& _cur_features0,
-								cv::Mat R, cv::Mat t, const cv::Mat& last_keyframe_img0, const cv::Mat& last_keyframe_img1); 
-	void projectToImg(const std::vector<cv::Point3d>& pts, const cv::Mat& K, const cv::Mat& R, const cv::Mat& t, cv::Mat& proj_img);
+				  const cv::Mat R, const cv::Mat t, double& scale, const cv::Mat& last_keyframe_img0, const cv::Mat& last_keyframe_img1); 
+	void projectToImg(const std::vector<cv::Point3d>& pts, double scale, const cv::Mat& K, const cv::Mat& R, const cv::Mat& t, cv::Mat& proj_img);
 public:
 	StereoCamera(const std::vector<double>& E0, 
 			     const std::vector<double>& K0, 

@@ -1,7 +1,7 @@
 #include "directSolver.h"
 #include <iostream>
 
-#define PYMD 1
+#define PYMD 3
 
 DirectSolver::DirectSolver()
 {
@@ -10,7 +10,7 @@ DirectSolver::DirectSolver()
 	g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
 
 	optimizer.setAlgorithm(solver);
-	optimizer.setVerbose(false);
+	optimizer.setVerbose(true);
 }
 
 void DirectSolver::poseEstimate(const vector<Gray3DPoint>& points, const cv::Mat& gray_img, Eigen::Matrix3d K, Eigen::Isometry3d& Tcw, int iter_num)
@@ -22,6 +22,8 @@ void DirectSolver::poseEstimate(const vector<Gray3DPoint>& points, const cv::Mat
 	for(int i=0; i<PYMD; i++)
 	{
 		img_pymd.push_back(tmp);
+		// cv::imshow("pymd", tmp);
+		// cv::waitKey();
 		K_pymd.push_back(K);
 
 		cv::pyrDown(tmp, tmp, cv::Size(tmp.cols/2, tmp.rows/2));
@@ -29,8 +31,9 @@ void DirectSolver::poseEstimate(const vector<Gray3DPoint>& points, const cv::Mat
 		K(2,2) = 1.0;
 		scale *= 2;
 	}
-	for(int p=PYMD-1; p>=0; p--)
+	// for(int p=PYMD-1; p>=0; p--)
 	{
+		int p=PYMD-1;
 		optimizer.clear();
 		g2o::VertexSE3Expmap* pose = new g2o::VertexSE3Expmap();
 		pose->setEstimate(g2o::SE3Quat(Tcw.rotation(), Tcw.translation()));

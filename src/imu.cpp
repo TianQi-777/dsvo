@@ -13,7 +13,7 @@ void IMU::imu_propagate(State& state, const Eigen::Vector3d& rot_vel, const Eige
 
 	// initialization
 	if(t_recent<0) {
-		state.imu_bias.acceleration = -lin_acc;
+		model.g = -lin_acc;
 		state.imu_bias.rotation = -rot_vel;
 		t_recent = t_cur;
 		return;
@@ -25,7 +25,7 @@ void IMU::imu_propagate(State& state, const Eigen::Vector3d& rot_vel, const Eige
 
 	// overall acceleration
 	Eigen::Matrix3d R = state.pose.orientation.toRotationMatrix();
-	Eigen::Vector3d acc = R*(lin_acc-state.imu_bias.acceleration);
+	Eigen::Vector3d acc = model.g + R*(lin_acc-state.imu_bias.acceleration);
 
 	// propagation 
 	state.pose.position = state.pose.position + state.velocity*d_t + 0.5*acc*d_t*d_t;
@@ -33,6 +33,6 @@ void IMU::imu_propagate(State& state, const Eigen::Vector3d& rot_vel, const Eige
 	state.velocity = state.velocity + acc*d_t;
 
 	// show pose
-	// state.showPose();
+	state.showPose();
     // std::cout<<"Propagating end "<<std::endl<<std::endl;
 }

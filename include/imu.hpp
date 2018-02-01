@@ -5,6 +5,7 @@
 
 struct IMUModel {
 	Eigen::Matrix4d T_BS;
+	Eigen::Vector3d g;
 };
 
 struct State;
