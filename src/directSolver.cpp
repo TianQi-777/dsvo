@@ -10,7 +10,7 @@ DirectSolver::DirectSolver()
 	g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
 
 	optimizer.setAlgorithm(solver);
-	optimizer.setVerbose(true);
+	optimizer.setVerbose(false);
 }
 
 void DirectSolver::poseEstimate(const vector<Gray3DPoint>& points, const cv::Mat& gray_img, Eigen::Matrix3d K, Eigen::Isometry3d& Tcw, int iter_num)

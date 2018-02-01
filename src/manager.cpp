@@ -67,9 +67,7 @@ void Manager::imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, 
 
 	img0_ptr->image.copyTo(cur_img0);
 	img1_ptr->image.copyTo(cur_img1);
-
-    cv::GaussianBlur(cur_img0, cur_img0, cv::Size(3,3), 1);
-    cv::GaussianBlur(cur_img1, cur_img1, cv::Size(3,3), 1);
+	
 	stereo_cam->track(state, cur_img0, cur_img1, img0_cptr->header.stamp.toSec());
 
 	return;

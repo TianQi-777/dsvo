@@ -30,7 +30,7 @@ struct CameraModel {
 	cv::Mat E;
 	cv::Mat K;
 	cv::Size frame_size;
-	cv::Mat dist_coeff;
+	std::vector<double> dist_coeff;
 };
 
 struct KeyFrame {
@@ -56,6 +56,8 @@ private:
 	CameraModel cam0;
 	CameraModel cam1;
 	StereoModel stereo;
+	Eigen::Isometry3d T_cam0_BS;
+	Eigen::Isometry3d T_cam0_BS_inv;
 	Frame last_frame;
 	std::vector<KeyFrame> keyframes;
 	shared_ptr<DirectSolver> directSolver_ptr;
@@ -68,11 +70,10 @@ private:
 	float monoTrack(const cv::Mat& last_frame_img, std::vector<cv::Point2f>& last_frame_features, 
 	                         const cv::Mat& last_keyframe_img, std::vector<cv::Point2f>& last_keyframe_features, 
 	                         const cv::Mat& cur_img, std::vector<cv::Point2f>& cur_features, 
-	                         const cv::Mat& K, cv::Mat& line_img, cv::Mat& R, cv::Mat& t);
-	void optimize(const std::vector<cv::Point2f>& last_keyframe_features0, const std::vector<cv::Point2f>& cur_features0,
+	                         const cv::Mat& K, cv::Mat& line_img, cv::Mat& R, cv::Mat& t, cv::Mat& inlier_mask);
+	void optimize(const std::vector<cv::Point2f>& _last_keyframe_features0, const std::vector<cv::Point2f>& _cur_features0,
 								cv::Mat R, cv::Mat t, const cv::Mat& last_keyframe_img0, const cv::Mat& last_keyframe_img1); 
-	void projectToRight(const std::vector<cv::Point2f>& last_keyframe_features0, const std::vector<cv::Point3d>& last_keyframe_pts, const cv::Mat& last_keyframe_img0,
-                        const cv::Mat& stereo_R, const cv::Mat& stereo_t, const cv::Mat& last_keyframe_img1, cv::Mat& proj_img);
+	void projectToImg(const std::vector<cv::Point3d>& pts, const cv::Mat& K, const cv::Mat& R, const cv::Mat& t, cv::Mat& proj_img);
 public:
 	StereoCamera(const std::vector<double>& E0, 
 			     const std::vector<double>& K0, 
@@ -82,5 +83,5 @@ public:
 			     const std::vector<double>& K1, 
 			     const std::vector<double>& frame_size1, 
 			     const std::vector<double>& dist_coeff1);
-	void track(State& cur_state, const cv::Mat& cur_img0, const cv::Mat& cur_img1, double cur_time);
+	void track(State& cur_state, const cv::Mat& _cur_img0, const cv::Mat& _cur_img1, double cur_time);
 };
