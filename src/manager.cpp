@@ -40,13 +40,13 @@ Manager::Manager() {
         return;
 	}
 
-	cam0_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, cam0_topic, 1);
-	cam1_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, cam1_topic, 1);
+	cam0_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, cam0_topic, 1000);
+	cam1_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, cam1_topic, 1000);
 
 	sync = new message_filters::Synchronizer<StereoSyncPolicy>(StereoSyncPolicy(10), *cam0_sub, *cam1_sub);
 	sync->registerCallback(boost::bind(&Manager::imageMessageCallback, this, _1, _2));
 	
-	imu_sub = nh.subscribe(imu_topic, 10, &Manager::imuMessageCallback, this);	
+	imu_sub = nh.subscribe(imu_topic, 1000, &Manager::imuMessageCallback, this);	
 }
 
 
@@ -67,7 +67,7 @@ void Manager::imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, 
 
 	img0_ptr->image.copyTo(cur_img0);
 	img1_ptr->image.copyTo(cur_img1);
-	
+
 	stereo_cam->track(state, cur_img0, cur_img1, img0_cptr->header.stamp.toSec());
 
 	return;
@@ -76,5 +76,5 @@ void Manager::imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, 
 void Manager::imuMessageCallback(const sensor_msgs::ImuConstPtr& imu_cptr) {
 	Eigen::Vector3d rot_vel(imu_cptr->angular_velocity.x, imu_cptr->angular_velocity.y, imu_cptr->angular_velocity.z);
 	Eigen::Vector3d lin_acc(imu_cptr->linear_acceleration.x, imu_cptr->linear_acceleration.y, imu_cptr->linear_acceleration.z);
-	imu->imu_propagate(state, rot_vel, lin_acc, imu_cptr->header.stamp.toSec());
+	// imu->imu_propagate(state, rot_vel, lin_acc, imu_cptr->header.stamp.toSec());
 }

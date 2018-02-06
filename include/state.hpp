@@ -28,6 +28,8 @@ struct State {
 	State();
 	ros::NodeHandle nh;
 	ros::Publisher pose_pub;
+	ros::Publisher pose_pub1;
+	void reset();
 	void showPose();
 };
 
