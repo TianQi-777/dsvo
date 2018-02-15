@@ -11,8 +11,6 @@ void State::reset() {
 	pose.position = Eigen::Vector3d::Zero();
 	pose.orientation = Eigen::Quaterniond::Identity();
 	velocity = Eigen::Vector3d::Zero();
-	imu_bias.acceleration = Eigen::Vector3d::Zero();
-	imu_bias.rotation = Eigen::Vector3d::Zero();
 }
 
 void State::showPose() {

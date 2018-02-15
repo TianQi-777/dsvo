@@ -13,17 +13,10 @@ struct Pose
 	Eigen::Quaterniond orientation;
 };
 
-struct IMU_bias
-{
-	Eigen::Vector3d acceleration;
-	Eigen::Vector3d rotation;
-};
-
 struct State {
 	// mean
 	Pose pose;
 	Eigen::Vector3d velocity;
-	IMU_bias imu_bias;
 
 	State();
 	ros::NodeHandle nh;
