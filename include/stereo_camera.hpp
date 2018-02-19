@@ -1,3 +1,5 @@
+#include <dynamic_reconfigure/server.h>
+#include "direct_stereo/DirectStereoConfig.h"
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <opencv2/core.hpp>
@@ -13,7 +15,6 @@
 #include <geometry_msgs/PoseStamped.h>
 #include "state.hpp"
 #include <string>
-
 
 typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
 
@@ -82,6 +83,9 @@ private:
 	ros::NodeHandle nh;
 	ros::Publisher pcl_pub;
 	ros::Publisher pose_pub;
+	dynamic_reconfigure::Server<direct_stereo::DirectStereoConfig> server;
+	dynamic_reconfigure::Server<direct_stereo::DirectStereoConfig>::CallbackType f;
+
 	CameraModel camera0;
 	CameraModel camera1;
 	Frame last_frame0;
@@ -89,6 +93,9 @@ private:
 	std::vector<KeyFrame> keyframes0;
 	std::vector<KeyFrame> keyframes1;
 	double last_time;
+	bool param_changed;
+
+	int frame_dropped_count;
 	// shared_ptr<DirectSolver> directSolver_ptr;
 
 	void reconstruct3DPts(std::vector<cv::Point2f>& features0, std::vector<cv::Point2f>& features1, 
@@ -104,7 +111,7 @@ private:
 
 	void featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::Mat& cur_img, const cv::Mat& K, FeatureTrackingResult& feature_tracking_result);
 
-	void propagateState(State& cur_state, const KeyFrame& lastKF, const std::vector<cv::Point2f>& cur_features, const CameraModel& cam);
+	void propagateState(State& cur_state, double cur_time, const KeyFrame& lastKF, const std::vector<cv::Point2f>& cur_features, const CameraModel& cam);
 
 	bool reconstructAndOptimize(const FeatureTrackingResult feature_result, const KeyFrame& lastKF, 
 								const CameraModel& cam0, const CameraModel& cam1,
@@ -124,5 +131,7 @@ public:
 			     const std::vector<double>& frame_size1, 
 			     const std::vector<double>& dist_coeff1);
 	
+	void updateConfig(direct_stereo::DirectStereoConfig &config, uint32_t level);
+
 	void track(State& cur_state, const cv::Mat& _cur_img0, const cv::Mat& _cur_img1, double cur_time);
 };

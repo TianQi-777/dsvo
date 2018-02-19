@@ -1,5 +1,7 @@
 #include "state.hpp"
 #include <iostream>
+#include <fstream>
+
 
 State::State() {
 	reset();
@@ -34,4 +36,6 @@ void State::showPose() {
 
 	pose_pub.publish(pose);
 
+	std::ofstream ofs("vo.txt", std::ofstream::app);
+	std::cout << this->pose.position[0]<<" "<< this->pose.position[1]<<" "<< this->pose.position[2]<<std::endl;
 }

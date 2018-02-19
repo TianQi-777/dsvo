@@ -6,9 +6,15 @@ set (CMAKE_CXX_STANDARD 11)
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   message_filters
+  dynamic_reconfigure
   roscpp
   pcl_ros
 )
+
+generate_dynamic_reconfigure_options(
+  cfg/DirectStereoConfig.cfg
+)
+
 include_directories(${catkin_INCLUDE_DIRS})
 
 catkin_package()
@@ -21,7 +27,15 @@ include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS})
 include_directories(include)
 
 add_executable(manager_node src/manager_node.cpp src/manager.cpp src/state.cpp src/stereo_camera.cpp)
+add_executable(truth_node src/pose_repub.cpp)
+
+add_dependencies(manager_node ${PROJECT_NAME}_gencfg)
+
 target_link_libraries(manager_node 
 	${catkin_LIBRARIES}
 	${OpenCV_LIBS}
+)
+
+target_link_libraries(truth_node 
+	${catkin_LIBRARIES}
 )

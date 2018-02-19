@@ -1,14 +1,8 @@
 #include "stereo_camera.hpp"
-#define MAX_REPROJ_DIST 1
-#define KP_BLOCKS 2
-#define INIT_MAX_KP 100
-#define NEW_KF_KP_RATIO 0.3
-#define MAX_OPT_STEP 100
-#define MIN_OPT_STEP 20
-#define WINDOW_SIZE 7
-#define LM_DAMP 500.0
-#define PYMD 5
-#define MONO_INLIER_THRES 0.5
+
+// parameters
+int MAX_REPROJ_DIST, KP_BLOCKS, INIT_MAX_KP, MAX_OPT_STEP, MIN_OPT_STEP, WINDOW_SIZE, PYMD;
+double LM_DAMP, NEW_KF_KP_RATIO, MONO_INLIER_THRES;
 
 double getPixelValue(const cv::Mat img, double x, double y) {
 	int xf=int(x), yf=int(y), xc=xf+1, yc=yf+1;
@@ -41,6 +35,21 @@ void getBatchAround(const cv::Mat img, double x, double y, Eigen::MatrixXd& batc
 		}
 	}
 	
+}
+
+void StereoCamera::updateConfig(direct_stereo::DirectStereoConfig &config, uint32_t level) {
+	// std::cout<<"Init param"<<std::endl;
+	MAX_REPROJ_DIST = config.MAX_REPROJ_DIST;
+	KP_BLOCKS = config.KP_BLOCKS;
+	INIT_MAX_KP = config.INIT_MAX_KP;
+	MAX_OPT_STEP = config.MAX_OPT_STEP;
+	MIN_OPT_STEP = config.MIN_OPT_STEP;
+	WINDOW_SIZE = config.WINDOW_SIZE;
+	PYMD = config.PYMD;
+	LM_DAMP = config.LM_DAMP;
+	NEW_KF_KP_RATIO = config.NEW_KF_KP_RATIO;
+	MONO_INLIER_THRES = config.MONO_INLIER_THRES;
+    param_changed = true;
 }
 
 StereoCamera::StereoCamera(const std::vector<double>& E0, 
@@ -132,8 +141,13 @@ StereoCamera::StereoCamera(const std::vector<double>& E0,
 	pcl_pub = nh.advertise<PointCloud> ("points2", 1);
     pose_pub = nh.advertise<geometry_msgs::PoseStamped>("cam_pose", 1000);
 
+	f = boost::bind(&StereoCamera::updateConfig, this, _1, _2);
+  	server.setCallback(f);
+    
     last_time = -1;
+    frame_dropped_count = 0;
     // directSolver_ptr = shared_ptr<DirectSolver>(new DirectSolver());
+    param_changed = true;
 }
 
 void StereoCamera::reconstruct3DPts(std::vector<cv::Point2f>& features0, std::vector<cv::Point2f>& features1, 
@@ -227,18 +241,17 @@ void StereoCamera::track(State& cur_state, const cv::Mat& _cur_img0, const cv::M
 
 void StereoCamera::monoTrack(State& cur_state, double cur_time, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const CameraModel& cam0, const CameraModel& cam1, 
 							 Frame& last_frame, std::vector<KeyFrame>& keyframes, const std::string& window_name) {
-	if(last_time < 0 || last_time > cur_time) {
+	if(last_time < 0 || last_time > cur_time || (cur_time-last_time) > 1.0 || param_changed) {
 		cur_state.reset();
 		keyframes.clear();
+		param_changed = false;
 	}
 
 	//initialize key_frame
     if(keyframes.empty() || keyframes.back().features0.size() < 50 ) {
-    	if(keyframes.empty()) {
-    		std::cout<<"Init KeyFrame"<<std::endl;
-    	} else {
-			std::cout<<"Drop Frame"<<std::endl;
-		}
+    	if(!keyframes.empty()) frame_dropped_count++;
+		
+		// std::cout<<"KeyFrame("<<keyframes.size()<<") | Dropped("<<frame_dropped_count<<")frames"<<std::endl;
 		FeaturePoints empty_fts_pts;
     	KeyFrame keyframe = createKeyFrame(cur_state.pose, cur_time, cur_img0, cur_img1, empty_fts_pts);
 	    keyframes.push_back(keyframe);
@@ -259,7 +272,7 @@ void StereoCamera::monoTrack(State& cur_state, double cur_time, const cv::Mat& c
 	featureTrack(lastKF, last_frame, cur_img0, cam0.K, feature_tracking_result);
 
 	// propagate state based on feature(pnp) tracking  
-	propagateState(cur_state, lastKF, feature_tracking_result.cur_feature_pnp, cam0);
+	propagateState(cur_state, cur_time, lastKF, feature_tracking_result.cur_feature_pnp, cam0);
 
     // update last_frame
 	last_frame.img = cur_img0.clone();
@@ -285,6 +298,7 @@ void StereoCamera::monoTrack(State& cur_state, double cur_time, const cv::Mat& c
         // construct new keyframe
 		// std::cout<<"New KeyFrame"<<std::endl;
 		KeyFrame keyframe = createKeyFrame(cur_state.pose, cur_time, cur_img0, cur_img1, lastKF_fts_pts);
+		// std::cout<<"KeyFrame("<<keyframes.size()<<") Dropped ("<<frame_dropped_count<<") frames"<<std::endl;
 	    keyframes.push_back(keyframe);
 	    last_frame.img = keyframe.img0.clone(); 
 	    last_frame.features = keyframe.features0;
@@ -295,7 +309,6 @@ void StereoCamera::monoTrack(State& cur_state, double cur_time, const cv::Mat& c
 }
 
 KeyFrame StereoCamera::createKeyFrame(const Pose& cur_pose, double cur_time, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const FeaturePoints& feature_points){
-	std::cout<<"New KeyFrame"<<std::endl;
 	KeyFrame keyframe = KeyFrame();
 
 	keyframe.pose = cur_pose;
@@ -337,17 +350,19 @@ void StereoCamera::featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::M
     line_img_pnp = line_img.clone();
 
 	// match points for PNP
-    std::vector<cv::Point2f> cur_feature_pnp;
-    std::cout<<last_frame.feature_pnp.size()<<std::endl;
+    std::vector<cv::Point2f> cur_feature_pnp, last_frame_pnp_features_back;
     if(!last_frame.feature_pnp.empty()) {
 	    std::vector<cv::Point2f> lastKF_feature_pnp_inlier, last_frame_feature_pnp_inlier, cur_feature_pnp_inlier;
 	    std::vector<cv::Point3f> lastKF_pts_pnp_inlier;
-	    std::vector<uchar> statu_pnp;
-	    std::vector<float> err_pnp;
+	    std::vector<uchar> statu_pnp, statu_pnp_back;
+	    std::vector<float> err_pnp,err_pnp_back;
 	    cv::calcOpticalFlowPyrLK(last_frame.img, cur_img, last_frame.feature_pnp, cur_feature_pnp, statu_pnp, err_pnp);
+	    cv::calcOpticalFlowPyrLK(cur_img, last_frame.img, cur_feature_pnp, last_frame_pnp_features_back, statu_pnp_back, err_pnp_back);
 	    for(int i=0; i<statu_pnp.size(); i++){
-	    	if(!statu_pnp[i]) continue;
-	    	if(cv::norm(last_frame.feature_pnp[i]-cur_feature_pnp[i]) > 9) continue;
+	    	if(!statu_pnp[i] || !statu_pnp_back[i]) continue;
+
+	    	// remove outlier by forward-backward matching
+	    	if(cv::norm(last_frame.feature_pnp[i]-last_frame_pnp_features_back[i]) > 16) continue;
 
 	    	lastKF_feature_pnp_inlier.push_back(lastKF.feature_points.features[i]);
 	    	lastKF_pts_pnp_inlier.push_back(lastKF.feature_points.points[i]);
@@ -367,13 +382,16 @@ void StereoCamera::featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::M
 
 
     // filter matches
-    std::vector<cv::Point2f> cur_features, lastKF_features_inlier, last_frame_features_inlier, cur_features_inlier;
-    std::vector<uchar> status;
-    std::vector<float> err;
+    std::vector<cv::Point2f> cur_features, last_frame_features_back, lastKF_features_inlier, last_frame_features_inlier, cur_features_inlier;
+    std::vector<uchar> status, status_back;
+    std::vector<float> err, err_back;
     cv::calcOpticalFlowPyrLK(last_frame.img, cur_img, last_frame.features, cur_features, status, err);
+    cv::calcOpticalFlowPyrLK(cur_img, last_frame.img, cur_features, last_frame_features_back, status_back, err_back);
     for(int i=0; i<status.size(); i++){
-    	if(!status[i]) continue;
-    	if(cv::norm(last_frame.features[i]-cur_features[i]) > 9) continue;
+    	if(!status[i] || !status_back[i]) continue;
+
+    	// remove outlier by forward-backward matching
+    	if(cv::norm(last_frame.features[i]-last_frame_features_back[i]) > 16) continue;
 
     	lastKF_features_inlier.push_back(lastKF.features0[i]);
     	last_frame_features_inlier.push_back(last_frame.features[i]);
@@ -408,19 +426,43 @@ void StereoCamera::featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::M
 	feature_tracking_result.t_lastKF2Cur = t;
 }
 
-void StereoCamera::propagateState(State& cur_state, const KeyFrame& lastKF, const std::vector<cv::Point2f>& cur_features, const CameraModel& cam) {
-	std::cout<<lastKF.feature_points.points.size()<<" = "<<cur_features.size()<<std::endl;
+void StereoCamera::propagateState(State& cur_state, double cur_time, const KeyFrame& lastKF, const std::vector<cv::Point2f>& cur_features, const CameraModel& cam) {
+	// std::cout<<lastKF.feature_points.points.size()<<" = "<<cur_features.size()<<std::endl;
 	assert(lastKF.feature_points.points.size() == cur_features.size());
+	bool brutePropagate = true;
 	if(lastKF.feature_points.points.size() > 10) {
-	    cv::Mat R, rvec, t;
-	    cv::solvePnPRansac( lastKF.feature_points.points, cur_features, cam.K, cv::Mat(), rvec, t);
+	    cv::Mat R, rvec, t, inlier_mask;
+	    cv::solvePnPRansac( lastKF.feature_points.points, cur_features, cam.K, cv::Mat(), rvec, t, false, 100, 3.0, 0.99, inlier_mask);
+	    float inlier_ratio = float(inlier_mask.rows) / float(cur_features.size());
 	    Rodrigues(rvec, R);
+	    // std::cout<<R<<std::endl<<t<<std::endl;
+	    // std::cout<<inlier_ratio<<std::endl;
 
-	    std::cout<<R<<std::endl<<t<<std::endl;
-	} else {
-		//TODO
+		Eigen::Matrix3d R_lastKF2Cur;
+		Eigen::Vector3d t_lastKF2Cur;
+		cv::cv2eigen(R, R_lastKF2Cur);
+		cv::cv2eigen(t, t_lastKF2Cur);
+		Eigen::Matrix3d R_w2Cur = R_lastKF2Cur * cam.R_B2C * lastKF.pose.orientation.toRotationMatrix().transpose();
+		Eigen::Vector3d t_Cur = (Eigen::Matrix3d::Identity() - R_lastKF2Cur) * cam.t_B2C;
+		Eigen::Vector3d t_world = R_w2Cur.transpose() * (t_lastKF2Cur - t_Cur);
+
+		if(inlier_ratio > 0.7 && inlier_ratio < 1.0 && t_world.norm() < 0.5) {
+			// std::cout<<"PnP Propagate"<<std::endl;
+			cur_state.pose.position = lastKF.pose.position - t_world;
+			cur_state.pose.orientation = Eigen::Quaterniond(R_w2Cur.transpose() * cam.R_B2C);
+		    cur_state.velocity = (cur_state.pose.position - lastKF.pose.position) / (cur_time - lastKF.time);
+
+			brutePropagate = false;
+		}
+
+	} 
+	if(brutePropagate) {
+		// std::cout<<"brutePropagate"<<std::endl;
+		cur_state.pose.position += cur_state.velocity * (cur_time - last_time);
 	}
 
+	// cur_state.showPose();
+	// cv::waitKey();
 }
 
 bool StereoCamera::reconstructAndOptimize(const FeatureTrackingResult feature_result, const KeyFrame& lastKF, 
@@ -452,11 +494,12 @@ bool StereoCamera::reconstructAndOptimize(const FeatureTrackingResult feature_re
 
 	// initial scale
 	double scale = t_lastKF2Cur.norm();
-	scale = 0.1;
+	// std::cout<<scale<<std::endl;
+	// scale = 0.1;
 	cv::Mat proj_before_opt = lastKF.img1.clone();
 	projectToImg(lastKF_pts, scale, cam1, proj_before_opt);
 	// std::cout<<"scale before "<<scale<<std::endl;
-	if(fabs(scale)>1 ) {
+	if(fabs(scale)<0.01 || fabs(scale)>1 ) {
 		// std::cout<<"bad scale"<<std::endl;
 		scale = 0.1;
 	}
@@ -609,7 +652,7 @@ bool StereoCamera::optimize_pymd(const std::vector<cv::Point2f>& fts, const std:
 	for(int i=0; i<pts.size(); i++) {
 		Eigen::MatrixXd tmp;
 		getBatchAround(img0, fts[i].x, fts[i].y, tmp);
-		b_mat.block<1, WINDOW_SIZE*WINDOW_SIZE>(i,0) = tmp;
+		b_mat.block(i,0,1,WINDOW_SIZE*WINDOW_SIZE) = tmp;
     }
 
 	// int delta = 0;
@@ -634,7 +677,7 @@ bool StereoCamera::optimize_pymd(const std::vector<cv::Point2f>& fts, const std:
 			Eigen::MatrixXd f;
 			getBatchAround(img1, u, v, f);
 
-			f_b_vec(i,0) = (b_mat.block<1,WINDOW_SIZE*WINDOW_SIZE>(i,0) - f).sum();
+			f_b_vec(i,0) = (b_mat.block(i,0,1,WINDOW_SIZE*WINDOW_SIZE) - f).sum();
 
 			Eigen::MatrixXd aI_ap(1,2);
 			aI_ap << (getPixelValue(img1, u+1.0, v)-getPixelValue(img1, u, v)), 
