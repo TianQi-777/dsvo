@@ -29,12 +29,8 @@ struct StereoModel
 
 struct FeaturePoints
 {
-	cv::Point2f feature;
-	cv::Point3d points;
-	FeaturePoints(const cv::Point2f& f, const cv::Point3d& p) {
-		feature = f;
-		points = p;
-	}
+	std::vector<cv::Point2f> features;
+	std::vector<cv::Point3f> points;
 };
 
 struct CameraModel {
@@ -53,6 +49,7 @@ struct KeyFrame {
 	double time;
 	cv::Mat img0;
     std::vector<cv::Point2f> features0;
+    FeaturePoints feature_points;
     int init_feature0_count;
 	cv::Mat img1;
 };
@@ -60,6 +57,7 @@ struct KeyFrame {
 struct Frame {
 	cv::Mat img;
     std::vector<cv::Point2f> features;
+    std::vector<cv::Point2f> feature_pnp;
 };
 
 struct  FeatureTrackingResult
@@ -67,10 +65,10 @@ struct  FeatureTrackingResult
 	double track_inliers;
     std::vector<cv::Point2f> lastKF_features;
     std::vector<cv::Point2f> cur_features;
+    std::vector<cv::Point2f> cur_feature_pnp;
 	cv::Mat inlier_mask;
 	cv::Mat R_lastKF2Cur;
 	cv::Mat t_lastKF2Cur;
-	cv::Mat line_img;
 
 	FeatureTrackingResult() {
 	   R_lastKF2Cur = cv::Mat::eye(3,3,CV_64F);
@@ -84,8 +82,8 @@ private:
 	ros::NodeHandle nh;
 	ros::Publisher pcl_pub;
 	ros::Publisher pose_pub;
-	CameraModel cam0;
-	CameraModel cam1;
+	CameraModel camera0;
+	CameraModel camera1;
 	Frame last_frame0;
 	Frame last_frame1;
 	std::vector<KeyFrame> keyframes0;
@@ -102,18 +100,20 @@ private:
 	void monoTrack(State& cur_state, double cur_time, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const CameraModel& cam0, const CameraModel& cam1,
 				   Frame& last_frame, std::vector<KeyFrame>& keyframes, const std::string& window_name);
 
-	KeyFrame createKeyFrame(const Pose& cur_pose, double cur_time, const cv::Mat& cur_img0, const cv::Mat& cur_img1);
+	KeyFrame createKeyFrame(const Pose& cur_pose, double cur_time, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const FeaturePoints& feature_points);
 
 	void featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::Mat& cur_img, const cv::Mat& K, FeatureTrackingResult& feature_tracking_result);
 
+	void propagateState(State& cur_state, const KeyFrame& lastKF, const std::vector<cv::Point2f>& cur_features, const CameraModel& cam);
+
 	bool reconstructAndOptimize(const FeatureTrackingResult feature_result, const KeyFrame& lastKF, 
 								const CameraModel& cam0, const CameraModel& cam1,
-								Pose& cur_pose, std::vector<FeaturePoints>& lastKF_fts_pts, cv::Mat& proj_img);
+								Pose& cur_pose, FeaturePoints& lastKF_fts_pts, cv::Mat& proj_img, cv::Mat& err_plot);
 
-	bool optimize(const std::vector<cv::Point2f>& fts, const std::vector<cv::Point3d>& pts, double& scale, const CameraModel& cam, const cv::Mat& img0, const cv::Mat& img1); 
+	bool optimize(const std::vector<cv::Point2f>& fts, const std::vector<cv::Point3d>& pts, double& scale, const CameraModel& cam, const cv::Mat& img0, const cv::Mat& img1, cv::Mat& err_plot); 
 	
 	bool optimize_pymd(const std::vector<cv::Point2f>& fts, const std::vector<cv::Point3d>& pts, const cv::Mat& X_mat, double& scale, 
-					   const cv::Mat& img0, const cv::Mat& img1, const cv::Mat& stereo_t, const cv::Mat& K, std::vector<double>& errs); 
+					   const cv::Mat& img0, const cv::Mat& img1, const StereoModel& stereo, const cv::Mat& K, std::vector<double>& errs); 
 public:
 	StereoCamera(const std::vector<double>& E0, 
 			     const std::vector<double>& K0, 
