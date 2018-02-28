@@ -1,8 +1,10 @@
 #include "stereo_camera.hpp"
+#include <cmath>
 
 // parameters
 int MAX_REPROJ_DIST, KP_BLOCKS, INIT_MAX_KP, MAX_OPT_STEP, MIN_OPT_STEP, WINDOW_SIZE, PYMD;
 double LM_DAMP, NEW_KF_KP_RATIO, MONO_INLIER_THRES;
+geometry_msgs::PointStamped new_pose_msg, last_pose_msg;
 
 double getPixelValue(const cv::Mat img, double x, double y) {
 	int xf=int(x), yf=int(y), xc=xf+1, yc=yf+1;
@@ -50,6 +52,13 @@ void StereoCamera::updateConfig(direct_stereo::DirectStereoConfig &config, uint3
 	NEW_KF_KP_RATIO = config.NEW_KF_KP_RATIO;
 	MONO_INLIER_THRES = config.MONO_INLIER_THRES;
     param_changed = true;
+}
+
+void StereoCamera::truth_Callback(const geometry_msgs::PointStamped::ConstPtr& msg)
+{
+	new_pose_msg.header = msg->header;
+	new_pose_msg.header.frame_id = "/map";
+	new_pose_msg.point = msg->point;
 }
 
 StereoCamera::StereoCamera(const std::vector<double>& E0, 
@@ -148,6 +157,11 @@ StereoCamera::StereoCamera(const std::vector<double>& E0,
     frame_dropped_count = 0;
     // directSolver_ptr = shared_ptr<DirectSolver>(new DirectSolver());
     param_changed = true;
+    init_time = -1;
+
+	truth_sub = nh.subscribe("/leica/position", 1000, &StereoCamera::truth_Callback, this);
+	vo_ofs.open("vo.txt", std::ofstream::out | std::ofstream::trunc);
+	gt_ofs.open("truth.txt", std::ofstream::out | std::ofstream::trunc);
 }
 
 void StereoCamera::reconstruct3DPts(std::vector<cv::Point2f>& features0, std::vector<cv::Point2f>& features1, 
@@ -231,10 +245,13 @@ void StereoCamera::track(State& cur_state, const cv::Mat& _cur_img0, const cv::M
 	//stereo rectify
 	cv::Mat cur_img0, cur_img1;
     cv::remap(_cur_img0, _cur_img0, camera0.rect_map_x, camera0.rect_map_y, cv::INTER_LINEAR);
-    cv::GaussianBlur(_cur_img0, cur_img0, cv::Size(3,3), 0);
+    cv::GaussianBlur(_cur_img0, cur_img0, cv::Size(3,3), 0.5);
     cv::remap(_cur_img1, _cur_img1, camera1.rect_map_x, camera1.rect_map_y, cv::INTER_LINEAR);
-    cv::GaussianBlur(_cur_img1, cur_img1, cv::Size(3,3), 0);
+    cv::GaussianBlur(_cur_img1, cur_img1, cv::Size(3,3), 0.5);
 
+	if(init_time < 0) {
+		init_time = cur_time;
+	}
 	monoTrack(cur_state, cur_time, cur_img0, cur_img1, camera0, camera1, last_frame0, keyframes0, "Left");
 	// monoTrack(cur_state, cur_time, cur_img1, cur_img0, camera1, camera0, last_frame1, keyframes1, "Right");
 }
@@ -251,7 +268,7 @@ void StereoCamera::monoTrack(State& cur_state, double cur_time, const cv::Mat& c
     if(keyframes.empty() || keyframes.back().features0.size() < 50 ) {
     	if(!keyframes.empty()) frame_dropped_count++;
 		
-		// std::cout<<"KeyFrame("<<keyframes.size()<<") | Dropped("<<frame_dropped_count<<")frames"<<std::endl;
+		std::cout<<"KeyFrame("<<keyframes.size()<<") | Dropped("<<frame_dropped_count<<")frames"<<std::endl;
 		FeaturePoints empty_fts_pts;
     	KeyFrame keyframe = createKeyFrame(cur_state.pose, cur_time, cur_img0, cur_img1, empty_fts_pts);
 	    keyframes.push_back(keyframe);
@@ -281,24 +298,47 @@ void StereoCamera::monoTrack(State& cur_state, double cur_time, const cv::Mat& c
 
 	if (feature_tracking_result.track_inliers>MONO_INLIER_THRES)
 	{
+		std::cout<<"inlier"<<feature_tracking_result.track_inliers<<std::endl;
 		Pose new_cur_pose = cur_state.pose;
-		cv::Mat proj_img, err_plot;
+		cv::Mat proj_img;
+		std::vector<double> errs;
 		FeaturePoints lastKF_fts_pts;
-		if(reconstructAndOptimize(feature_tracking_result, lastKF, cam0, cam1, new_cur_pose, lastKF_fts_pts, proj_img, err_plot)) {
+		if(reconstructAndOptimize(feature_tracking_result, lastKF, cam0, cam1, new_cur_pose, lastKF_fts_pts, proj_img, errs)) {
 			std::string proj_window_name = window_name + " projection";
 			std::string err_window_name = window_name + " error";
 			cv::imshow(proj_window_name, proj_img);
+			cv::Ptr<cv::plot::Plot2d> eplot = cv::plot::Plot2d::create(errs);
+			cv::Mat err_plot;
+			eplot->setInvertOrientation( true );
+			eplot->render(err_plot);
 			cv::imshow(err_window_name, err_plot);
 		    cur_state.pose = new_cur_pose;
 		    cur_state.velocity = (cur_state.pose.position - lastKF.pose.position) / (cur_time - lastKF.time);
 		    cur_state.showPose();
+			vo_ofs << cur_time - init_time << " " << cur_state.pose.position[0] << " " << cur_state.pose.position[1] << " " << cur_state.pose.position[2] << " " 
+				   << lastKF_fts_pts.points.size() << " " << errs.front() << " " << errs.back() << " " << errs.size() <<std::endl;
+			gt_ofs << new_pose_msg.header.stamp.toSec() - init_time << " "
+			   	   << new_pose_msg.point.x << " "
+			  	   << new_pose_msg.point.y << " "
+			  	   << new_pose_msg.point.z << std::endl;
+			double vvn = cur_state.velocity.norm();
+			double tvn = sqrt((new_pose_msg.point.x - last_pose_msg.point.x)*(new_pose_msg.point.x - last_pose_msg.point.x)  
+				   			 +(new_pose_msg.point.y - last_pose_msg.point.y)*(new_pose_msg.point.y - last_pose_msg.point.y)  
+				   			 +(new_pose_msg.point.z - last_pose_msg.point.z)*(new_pose_msg.point.z - last_pose_msg.point.z)) / (cur_time - lastKF.time);
+			last_pose_msg = new_pose_msg;
+	  	    double diff = fabs(vvn - tvn);
+			if( diff > 0.2) {
+			   	std::cout<<diff<<std::endl;
+				// cv::waitKey();
+			}
+			// cv::waitKey();
 		}
 
 		cv::waitKey(1);
         // construct new keyframe
 		// std::cout<<"New KeyFrame"<<std::endl;
 		KeyFrame keyframe = createKeyFrame(cur_state.pose, cur_time, cur_img0, cur_img1, lastKF_fts_pts);
-		// std::cout<<"KeyFrame("<<keyframes.size()<<") Dropped ("<<frame_dropped_count<<") frames"<<std::endl;
+		std::cout<<"KeyFrame("<<keyframes.size()<<") Dropped ("<<frame_dropped_count<<") frames"<<std::endl;
 	    keyframes.push_back(keyframe);
 	    last_frame.img = keyframe.img0.clone(); 
 	    last_frame.features = keyframe.features0;
@@ -323,7 +363,7 @@ KeyFrame StereoCamera::createKeyFrame(const Pose& cur_pose, double cur_time, con
     	for(int j=0; j<KP_BLOCKS; j++) {
     		cv::Rect subRegion = cv::Rect(i*subCols, j*subRows, subCols, subRows);
     		std::vector<cv::Point2f> subFeatures0, subFeatures1;
-		    cv::goodFeaturesToTrack(keyframe.img0(subRegion), subFeatures0, INIT_MAX_KP, 0.01, 5);
+		    cv::goodFeaturesToTrack(keyframe.img0(subRegion), subFeatures0, INIT_MAX_KP, 0.01, 10);
 		    for(int k=0; k<subFeatures0.size(); k++) {
 		    	keyframe.features0.push_back(cv::Point2f(subFeatures0[k].x+i*subCols, subFeatures0[k].y+j*subRows));
 		    }
@@ -368,9 +408,9 @@ void StereoCamera::featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::M
 	    	lastKF_pts_pnp_inlier.push_back(lastKF.feature_points.points[i]);
 	    	last_frame_feature_pnp_inlier.push_back(last_frame.feature_pnp[i]);
 	    	cur_feature_pnp_inlier.push_back(cur_feature_pnp[i]);
-	    	cv::line(line_img_pnp, lastKF.feature_points.features[i], cv::Point2f(cur_feature_pnp[i].x+lastKF.img0.cols, cur_feature_pnp[i].y), cv::Scalar(255,0,0));
+	    	// cv::line(line_img_pnp, lastKF.feature_points.features[i], cv::Point2f(cur_feature_pnp[i].x+lastKF.img0.cols, cur_feature_pnp[i].y), cv::Scalar(255,0,0));
 	    } 
-		cv::imshow("line_img_pnp", line_img_pnp);
+		// cv::imshow("line_img_pnp", line_img_pnp);
 
 	    lastKF.feature_points.features = lastKF_feature_pnp_inlier; 
 	    lastKF.feature_points.points = lastKF_pts_pnp_inlier; 
@@ -467,7 +507,7 @@ void StereoCamera::propagateState(State& cur_state, double cur_time, const KeyFr
 
 bool StereoCamera::reconstructAndOptimize(const FeatureTrackingResult feature_result, const KeyFrame& lastKF, 
 										  const CameraModel& cam0, const CameraModel& cam1,
-										  Pose& cur_pose, FeaturePoints& lastKF_fts_pts, cv::Mat& proj_img, cv::Mat& err_plot)
+										  Pose& cur_pose, FeaturePoints& lastKF_fts_pts, cv::Mat& proj_img, std::vector<double>& errs)
 {
 	assert(feature_result.lastKF_features.size() == feature_result.cur_features.size());
 	// remove outlier by pose estimation
@@ -506,7 +546,7 @@ bool StereoCamera::reconstructAndOptimize(const FeatureTrackingResult feature_re
 
 	// optimization
 	double new_scale = scale;
-    if(!optimize(lastKF_features_inlier, lastKF_pts, new_scale, cam1, lastKF.img0, lastKF.img1, err_plot)) {
+    if(!optimize(lastKF_features_inlier, lastKF_pts, new_scale, cam1, lastKF.img0, lastKF.img1, errs)) {
     	return false;
     }
     scale = new_scale;
@@ -568,7 +608,7 @@ bool StereoCamera::reconstructAndOptimize(const FeatureTrackingResult feature_re
 	return true;
 }
 
-bool StereoCamera::optimize(const std::vector<cv::Point2f>& fts, const std::vector<cv::Point3d>& pts, double& scale, const CameraModel& cam, const cv::Mat& img0, const cv::Mat& img1, cv::Mat& err_plot) 
+bool StereoCamera::optimize(const std::vector<cv::Point2f>& fts, const std::vector<cv::Point3d>& pts, double& scale, const CameraModel& cam, const cv::Mat& img0, const cv::Mat& img1, std::vector<double>& errs) 
 {
 	cv::Mat tmp0 = img0.clone();
 	cv::Mat tmp1 = img1.clone();
@@ -605,7 +645,6 @@ bool StereoCamera::optimize(const std::vector<cv::Point2f>& fts, const std::vect
     }
     X_mat = cam.stereo.R*X_mat;
 
-    std::vector<double> errs;
 	for(int i=PYMD-1; i>=0; i--)
 	{
 		// std::cout<<"Prymaid "<<i<<std::endl;
@@ -615,10 +654,6 @@ bool StereoCamera::optimize(const std::vector<cv::Point2f>& fts, const std::vect
 		// cv::waitKey();
 	}
 
-	cv::Ptr<cv::plot::Plot2d> eplot = cv::plot::Plot2d::create(errs);
-	eplot->setInvertOrientation( true );
-	eplot->render(err_plot);
-
 	return true;
 
 }
@@ -627,7 +662,7 @@ bool StereoCamera::optimize_pymd(const std::vector<cv::Point2f>& fts, const std:
 								 const cv::Mat& img0, const cv::Mat& img1, const StereoModel& stereo, const cv::Mat& K, std::vector<double>& errs) 
 {
 	// optimize scale inverse for speed
-	double scale_inv = 1.0/scale;
+	// double scale_inv = 1.0/scale;
 
 	cv::Mat KX = K*X_mat;
 	double Ktx = K.at<double>(0,0) * stereo.t.at<double>(0,0);
@@ -671,13 +706,13 @@ bool StereoCamera::optimize_pymd(const std::vector<cv::Point2f>& fts, const std:
 	double err_offset = 0.0;
     for(int opt_step=0; opt_step<MAX_OPT_STEP; opt_step++) {
     	for(int i=0; i<pts.size(); i++) {
-    		double u = u_base_vec[i] + scale_inv * u_off_vec[i];
+    		double u = u_base_vec[i] + 1.0/scale * u_off_vec[i];
     		double v = v_vec[i];
 
 			Eigen::MatrixXd f;
 			getBatchAround(img1, u, v, f);
 
-			f_b_vec(i,0) = (b_mat.block(i,0,1,WINDOW_SIZE*WINDOW_SIZE) - f).sum();
+			f_b_vec(i,0) = (b_mat.block(i,0,1,WINDOW_SIZE*WINDOW_SIZE) - f).sum() + scale * scale;
 
 			Eigen::MatrixXd aI_ap(1,2);
 			aI_ap << (getPixelValue(img1, u+1.0, v)-getPixelValue(img1, u, v)), 
@@ -686,21 +721,21 @@ bool StereoCamera::optimize_pymd(const std::vector<cv::Point2f>& fts, const std:
 			Eigen::MatrixXd ap_as(2,1);
 			ap_as << u_off_vec[i], 0;
 
-			Eigen::MatrixXd _grad = aI_ap * ap_as;
-			Jac(i,0) = _grad(0,0);
+			Eigen::MatrixXd _grad = -1.0/scale/scale * aI_ap * ap_as;
+			Jac(i,0) = _grad(0,0) + 2*scale;
 	    }
 	    Eigen::MatrixXd JTJ = Jac.transpose() * Jac;
 	    if(JTJ.determinant() == 0) return false;
 
 	    // std::cout<<Jac<<std::endl;
-	    Eigen::MatrixXd _d_scale_inv = (1.0 / ((JTJ + lm_damp_cur*Eigen::MatrixXd(JTJ.diagonal().asDiagonal()))(0,0)) ) * (Jac.transpose() * f_b_vec);
-	    double d_scale_inv = _d_scale_inv(0,0);
+	    Eigen::MatrixXd _d_scale = (1.0 / ((JTJ + lm_damp_cur*Eigen::MatrixXd(JTJ.diagonal().asDiagonal()))(0,0)) ) * (Jac.transpose() * f_b_vec);
+	    double d_scale = _d_scale(0,0);
 
 
 		if(opt_step==0 && !errs.empty()) {
-			err_offset = f_b_vec.norm() - errs.back();
+			err_offset = f_b_vec.norm()/pts.size() - errs.back();
 		}
-	    double cur_err = f_b_vec.norm() - err_offset;
+	    double cur_err = f_b_vec.norm()/pts.size() - err_offset;
 
 	    // converge detection
 	    // std::cout<<cur_err<<std::endl;
@@ -713,13 +748,13 @@ bool StereoCamera::optimize_pymd(const std::vector<cv::Point2f>& fts, const std:
 	    	return true;
 	    } 
 
-	    scale_inv += d_scale_inv;
+	    // scale_inv += d_scale_inv;
+	    scale += d_scale;
 
 	    errs.push_back(cur_err);
-	    
-	    if(scale > 1) return false;
 
-	    scale = 1.0 / scale_inv;
+	    // scale = 1.0 / scale_inv;
+	    if(scale > 0.5) return false;
 
 		// cv::Mat opt = img1.clone();
 		// projectToImg(pts, scale, cam, opt);

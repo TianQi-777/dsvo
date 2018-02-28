@@ -27,15 +27,10 @@ include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS})
 include_directories(include)
 
 add_executable(manager_node src/manager_node.cpp src/manager.cpp src/state.cpp src/stereo_camera.cpp)
-add_executable(truth_node src/pose_repub.cpp)
 
 add_dependencies(manager_node ${PROJECT_NAME}_gencfg)
 
 target_link_libraries(manager_node 
 	${catkin_LIBRARIES}
 	${OpenCV_LIBS}
-)
-
-target_link_libraries(truth_node 
-	${catkin_LIBRARIES}
 )

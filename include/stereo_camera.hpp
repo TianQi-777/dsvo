@@ -13,8 +13,10 @@
 #include <opencv2/plot.hpp>
 #include <pcl_ros/point_cloud.h>
 #include <geometry_msgs/PoseStamped.h>
+#include "geometry_msgs/PointStamped.h"
 #include "state.hpp"
 #include <string>
+#include <fstream>
 
 typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
 
@@ -83,6 +85,7 @@ private:
 	ros::NodeHandle nh;
 	ros::Publisher pcl_pub;
 	ros::Publisher pose_pub;
+	ros::Subscriber truth_sub;
 	dynamic_reconfigure::Server<direct_stereo::DirectStereoConfig> server;
 	dynamic_reconfigure::Server<direct_stereo::DirectStereoConfig>::CallbackType f;
 
@@ -94,9 +97,15 @@ private:
 	std::vector<KeyFrame> keyframes1;
 	double last_time;
 	bool param_changed;
+	double init_time;
+
+	std::ofstream vo_ofs;
+	std::ofstream gt_ofs;
 
 	int frame_dropped_count;
 	// shared_ptr<DirectSolver> directSolver_ptr;
+
+	void truth_Callback(const geometry_msgs::PointStamped::ConstPtr& msg);
 
 	void reconstruct3DPts(std::vector<cv::Point2f>& features0, std::vector<cv::Point2f>& features1, 
 						  const cv::Mat& K, const cv::Mat& R, const cv::Mat& t,
@@ -115,9 +124,9 @@ private:
 
 	bool reconstructAndOptimize(const FeatureTrackingResult feature_result, const KeyFrame& lastKF, 
 								const CameraModel& cam0, const CameraModel& cam1,
-								Pose& cur_pose, FeaturePoints& lastKF_fts_pts, cv::Mat& proj_img, cv::Mat& err_plot);
+								Pose& cur_pose, FeaturePoints& lastKF_fts_pts, cv::Mat& proj_img, std::vector<double>& errs);
 
-	bool optimize(const std::vector<cv::Point2f>& fts, const std::vector<cv::Point3d>& pts, double& scale, const CameraModel& cam, const cv::Mat& img0, const cv::Mat& img1, cv::Mat& err_plot); 
+	bool optimize(const std::vector<cv::Point2f>& fts, const std::vector<cv::Point3d>& pts, double& scale, const CameraModel& cam, const cv::Mat& img0, const cv::Mat& img1, std::vector<double>& errs); 
 	
 	bool optimize_pymd(const std::vector<cv::Point2f>& fts, const std::vector<cv::Point3d>& pts, const cv::Mat& X_mat, double& scale, 
 					   const cv::Mat& img0, const cv::Mat& img1, const StereoModel& stereo, const cv::Mat& K, std::vector<double>& errs); 

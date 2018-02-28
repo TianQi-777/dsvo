@@ -1,12 +1,14 @@
 #include "state.hpp"
 #include <iostream>
-#include <fstream>
-
+#include <stdlib.h>
 
 State::State() {
 	reset();
 	pose_pub = nh.advertise<geometry_msgs::PoseStamped>("cam_pose", 1000);
 	pose_pub1 = nh.advertise<geometry_msgs::PoseStamped>("cam_pose1", 1000);
+	// if(!ofs) std::cout<<"fail to open vo.txt"<<std::endl;
+	// else ofs<<"open vo.txt"<<std::endl;
+	// ofs.close();
 }
 
 void State::reset() {
@@ -35,7 +37,4 @@ void State::showPose() {
 	pose.pose.orientation.z = this->pose.orientation.x();
 
 	pose_pub.publish(pose);
-
-	std::ofstream ofs("vo.txt", std::ofstream::app);
-	std::cout << this->pose.position[0]<<" "<< this->pose.position[1]<<" "<< this->pose.position[2]<<std::endl;
 }
