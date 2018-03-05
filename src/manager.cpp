@@ -35,7 +35,6 @@ Manager::Manager() {
 
 	sync = new message_filters::Synchronizer<StereoSyncPolicy>(StereoSyncPolicy(10), *cam0_sub, *cam1_sub);
 	sync->registerCallback(boost::bind(&Manager::imageMessageCallback, this, _1, _2));
-	
 }
 
 
@@ -57,7 +56,7 @@ void Manager::imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, 
 	img0_ptr->image.copyTo(cur_img0);
 	img1_ptr->image.copyTo(cur_img1);
 
-	stereo_cam->track(state, cur_img0, cur_img1, img0_cptr->header.stamp.toSec());
+	stereo_cam->track(state, cur_img0, cur_img1, img0_cptr->header.stamp);
 
 	return;
 }

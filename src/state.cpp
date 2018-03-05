@@ -5,7 +5,6 @@
 State::State() {
 	reset();
 	pose_pub = nh.advertise<geometry_msgs::PoseStamped>("cam_pose", 1000);
-	pose_pub1 = nh.advertise<geometry_msgs::PoseStamped>("cam_pose1", 1000);
 	// if(!ofs) std::cout<<"fail to open vo.txt"<<std::endl;
 	// else ofs<<"open vo.txt"<<std::endl;
 	// ofs.close();
@@ -26,6 +25,7 @@ void State::showPose() {
 	geometry_msgs::PoseStamped pose;
 
 	pose.header.frame_id = "/map";
+	pose.header.stamp = time;
 
 	pose.pose.position.x = this->pose.position[1];
 	pose.pose.position.y = this->pose.position[2];

@@ -15,13 +15,13 @@ struct Pose
 
 struct State {
 	// mean
+	ros::Time time;
 	Pose pose;
 	Eigen::Vector3d velocity;
 
 	State();
 	ros::NodeHandle nh;
 	ros::Publisher pose_pub;
-	ros::Publisher pose_pub1;
 	void reset();
 	void showPose();
 };
