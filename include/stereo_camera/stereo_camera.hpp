@@ -1,7 +1,9 @@
 #include "direct_stereo/DirectStereoConfig.h"
 #include "data.hpp"
+#include "helper.hpp"
 #include "reconstructor.hpp"
-#include "optimizer.hpp"
+#include "scale_optimizer.hpp"
+#include "local_KF_optimizer.hpp"
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <opencv2/core.hpp>
@@ -14,19 +16,20 @@
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/plot.hpp>
 #include <dynamic_reconfigure/server.h>
-#include <pcl_ros/point_cloud.h>
+// #include <pcl_ros/point_cloud.h>
 #include <geometry_msgs/PoseStamped.h>
 #include "geometry_msgs/PointStamped.h"
 #include "state.hpp"
 #include <string>
+#include <ctime>
 
-typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
+// typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
 
 class StereoCamera
 {
 private:
 	ros::NodeHandle nh;
-	ros::Publisher pcl_pub;
+	// ros::Publisher pcl_pub;
 	ros::Publisher pose_pub;
 	dynamic_reconfigure::Server<direct_stereo::DirectStereoConfig> server;
 	dynamic_reconfigure::Server<direct_stereo::DirectStereoConfig>::CallbackType f;
@@ -42,7 +45,8 @@ private:
 	double init_time;
 
 	Reconstructor reconstructor;
-	Optimizer optimizer;
+	ScaleOptimizer scale_optimizer;
+	LocalKFOptimizer local_KF_optimizer;
 
 	int frame_dropped_count;
 	// shared_ptr<DirectSolver> directSolver_ptr;

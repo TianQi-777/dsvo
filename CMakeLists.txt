@@ -8,7 +8,6 @@ find_package(catkin REQUIRED COMPONENTS
   message_filters
   dynamic_reconfigure
   roscpp
-  pcl_ros
 )
 
 generate_dynamic_reconfigure_options(
@@ -22,7 +21,8 @@ FIND_PACKAGE( G2O REQUIRED )
 FIND_PACKAGE( CSparse REQUIRED )
 INCLUDE_DIRECTORIES( ${G2O_INCLUDE_DIR} ${CSPARSE_INCLUDE_DIR} )
 
-include_directories(${catkin_INCLUDE_DIRS})
+include_directories(${catkin_INCLUDE_DIRS}
+    "/usr/include/eigen3/")
 
 catkin_package()
 
@@ -33,7 +33,7 @@ include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS})
 
 include_directories(include)
 
-add_executable(manager_node src/manager_node.cpp src/manager.cpp src/state.cpp src/comparer.cpp src/stereo_camera/stereo_camera.cpp src/stereo_camera/reconstructor.cpp src/stereo_camera/optimizer.cpp src/stereo_camera/scale_edge.cpp)
+add_executable(manager_node src/manager_node.cpp src/manager.cpp src/state.cpp src/comparer.cpp src/stereo_camera/stereo_camera.cpp src/stereo_camera/reconstructor.cpp src/stereo_camera/scale_edge.cpp src/stereo_camera/scale_optimizer.cpp src/stereo_camera/local_KF_optimizer.cpp src/stereo_camera/local_KF_edge.cpp)
 
 add_dependencies(manager_node ${PROJECT_NAME}_gencfg)
 

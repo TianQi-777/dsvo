@@ -2,8 +2,8 @@
 #include <cmath>
 
 // parameters
-int MAX_REPROJ_DIST, KP_BLOCKS, INIT_MAX_KP, MAX_OPT_STEP, MIN_OPT_STEP, WINDOW_SIZE, PYMD, MIN_FEATURE_DIST;
-double LM_DAMP, NEW_KF_KP_RATIO, MONO_INLIER_THRES, QUAL_LEVEL;
+int MAX_REPROJ_DIST, KP_BLOCKS, INIT_MAX_KP, MAX_OPT_STEP, PYMD, MIN_FEATURE_DIST;
+double NEW_KF_KP_RATIO, MONO_INLIER_THRES, QUAL_LEVEL;
 geometry_msgs::PointStamped new_pose_msg, last_pose_msg;
 
 void StereoCamera::updateConfig(direct_stereo::DirectStereoConfig &config, uint32_t level) {
@@ -14,10 +14,7 @@ void StereoCamera::updateConfig(direct_stereo::DirectStereoConfig &config, uint3
 	QUAL_LEVEL = config.QUAL_LEVEL;
 	MIN_FEATURE_DIST = config.MIN_FEATURE_DIST;
 	MAX_OPT_STEP = config.MAX_OPT_STEP;
-	MIN_OPT_STEP = config.MIN_OPT_STEP;
-	WINDOW_SIZE = config.WINDOW_SIZE;
 	PYMD = config.PYMD;
-	LM_DAMP = config.LM_DAMP;
 	NEW_KF_KP_RATIO = config.NEW_KF_KP_RATIO;
 	MONO_INLIER_THRES = config.MONO_INLIER_THRES;
     param_changed = true;
@@ -109,7 +106,7 @@ StereoCamera::StereoCamera(const std::vector<double>& E0,
 	camera0.stereo = stereo1;
 
 	// std::cout<<stereo0.t<<std::endl;
-	pcl_pub = nh.advertise<PointCloud> ("points2", 1);
+	// pcl_pub = nh.advertise<PointCloud> ("points2", 1);
     pose_pub = nh.advertise<geometry_msgs::PoseStamped>("cam_pose", 1000);
 
 	f = boost::bind(&StereoCamera::updateConfig, this, _1, _2);
@@ -204,12 +201,15 @@ void StereoCamera::monoTrack(State& cur_state, ros::Time cur_time_ros, const cv:
 
     KeyFrame& lastKF = keyframes.back();
 
+	std::clock_t start;
+	start = std::clock();
 	//feature tracking
 	FeatureTrackingResult feature_tracking_result;
 	featureTrack(lastKF, last_frame, cur_img0, cam0.K, feature_tracking_result);
 
 	// propagate state based on feature(pnp) tracking  
 	propagateState(cur_state, cur_time, lastKF, feature_tracking_result.cur_feature_pnp, cam0);
+		std::cout << "featureTrack and propagateState: " << (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " ms" << std::endl;
 
     // update last_frame
 	last_frame.img = cur_img0.clone();
@@ -218,26 +218,22 @@ void StereoCamera::monoTrack(State& cur_state, ros::Time cur_time_ros, const cv:
 
 	if (feature_tracking_result.track_inliers>MONO_INLIER_THRES)
 	{
-		std::cout<<"inlier"<<feature_tracking_result.track_inliers<<std::endl;
+		// std::cout<<"inlier"<<feature_tracking_result.track_inliers<<std::endl;
 
 		Pose new_cur_pose = cur_state.pose;
 		cv::Mat proj_img;
 		std::vector<double> errs;
 		FeaturePoints curKF_fts_pts;
-		if(reconstructAndOptimize(feature_tracking_result, lastKF, cam0, cam1, new_cur_pose, curKF_fts_pts, proj_img, errs, cur_img0, cur_img1)) {
+		std::clock_t start;
+		start = std::clock();
+		bool re = reconstructAndOptimize(feature_tracking_result, lastKF, cam0, cam1, new_cur_pose, curKF_fts_pts, proj_img, errs, cur_img0, cur_img1);
+		std::cout << "reconstructAndOptimize: " << (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " ms" << std::endl;
+		if(re) {
 			std::string proj_window_name = window_name + " projection";
-			std::string err_window_name = window_name + " error";
 			cv::imshow(proj_window_name, proj_img);
-			// for(auto& it: errs) std::cout<<it<<" ";
-			// std::cout<<std::endl;
-			// cv::Ptr<cv::plot::Plot2d> eplot = cv::plot::Plot2d::create(errs);
-			// cv::Mat err_plot;
-			// eplot->setInvertOrientation( true );
-			// eplot->render(err_plot);
-			// cv::imshow(err_window_name, err_plot);
-			cv::waitKey();
+			cv::waitKey(1);
 
-			optimizer.localLoopOptimization(keyframes, 10, cam0, cur_img0, curKF_fts_pts, new_cur_pose);
+			local_KF_optimizer.optimize(keyframes, 5, cam0, cur_img0, curKF_fts_pts, new_cur_pose);
 
 			// uodate current state
 		    cur_state.pose = new_cur_pose;
@@ -369,7 +365,6 @@ void StereoCamera::propagateState(State& cur_state, double cur_time, const KeyFr
 
 	} 
 	if(brutePropagate) {
-		std::cout<<"brutePropagate"<<std::endl;
 		cur_state.pose.position += cur_state.velocity * (cur_time - last_time);
 	}
 
@@ -382,6 +377,7 @@ bool StereoCamera::reconstructAndOptimize(FeatureTrackingResult feature_result, 
 										  Pose& cur_pose, FeaturePoints& curKF_fts_pts, cv::Mat& proj_img, std::vector<double>& errs, 
 										  const cv::Mat& cur_img0, const cv::Mat& cur_img1)
 {
+	std::clock_t start;
 	assert(feature_result.lastKF_features.size() == feature_result.cur_features.size());
 	// remove outlier by pose estimation
 	std::vector<cv::Point2f> lastKF_features_inlier, cur_features_inlier;
@@ -395,7 +391,9 @@ bool StereoCamera::reconstructAndOptimize(FeatureTrackingResult feature_result, 
     //reconstruct 3D pts and bundle adjustment
 	cv::Mat reproj = lastKF.img0.clone();
 	std::vector<cv::Point3d> lastKF_pts;
+	start = std::clock();
 	reconstructor.reconstructAndBundleAdjust(lastKF_features_inlier, cur_features_inlier, cam0.K, feature_result.R_lastKF2Cur, feature_result.t_lastKF2Cur, MAX_REPROJ_DIST, lastKF_pts, reproj);
+	std::cout << "reconstructAndBundleAdjust: " << (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " ms" << std::endl;
 
 	// current scale
 	Eigen::Matrix3d R_lastKF2Cur_eigen;
@@ -414,37 +412,39 @@ bool StereoCamera::reconstructAndOptimize(FeatureTrackingResult feature_result, 
     // cv::imshow("proj_before_opt", proj_before_opt);
 	// std::cout<<"scale before "<<scale<<std::endl;
 	if(fabs(scale)<0.01 || fabs(scale)>1 ) {
-		std::cout<<"bad scale before: "<<scale<<std::endl;
+		// std::cout<<"bad scale before: "<<scale<<std::endl;
 		scale = 0.1;
 	}
 
 
 	// optimization
 	double new_scale = scale;
-    if(!optimizer.optimize(lastKF_features_inlier, lastKF_pts, new_scale, cam0, cam1, lastKF.img0, lastKF.img1, PYMD, MAX_OPT_STEP)) {
+	start = std::clock();
+    if(!scale_optimizer.optimize(lastKF_features_inlier, lastKF_pts, new_scale, cam1, lastKF.img0, lastKF.img1, PYMD, MAX_OPT_STEP)) {
     	return false;
     }
+	std::cout << "scale optimize: " << (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " ms" << std::endl;
     scale = new_scale;
 
 	// final scale
-	std::cout<<"scale after "<<scale<<std::endl;
+	// std::cout<<"scale after "<<scale<<std::endl;
 	// if(fabs(scale)>1 ) {
 	// 	std::cout<<"bad scale after: "<<scale<<std::endl;
 	// 	scale = 0.1;
 	// }
 
-    PointCloud::Ptr point_cloud (new PointCloud);
-    for(int i=0; i<lastKF_pts.size(); i++) {
-    	// std::cout<<lastKF_pts[i]<<std::endl;
-        pcl::PointXYZ p;
-        p.x = scale*lastKF_pts[i].y;
-        p.y = scale*lastKF_pts[i].z;
-        p.z = scale*lastKF_pts[i].x;
-        point_cloud->push_back(p);
-    }
+    // PointCloud::Ptr point_cloud (new PointCloud);
+    // for(int i=0; i<lastKF_pts.size(); i++) {
+    // 	// std::cout<<lastKF_pts[i]<<std::endl;
+    //     pcl::PointXYZ p;
+    //     p.x = scale*lastKF_pts[i].y;
+    //     p.y = scale*lastKF_pts[i].z;
+    //     p.z = scale*lastKF_pts[i].x;
+    //     point_cloud->push_back(p);
+    // }
 
-    point_cloud->header.frame_id = "/map";
-    pcl_pub.publish(point_cloud);
+    // point_cloud->header.frame_id = "/map";
+    // pcl_pub.publish(point_cloud);
 
 //   	for(double s=0.01; s<0.2; s+=0.01) {
 //   		std::cout<<"xxx "<<s<<std::endl;

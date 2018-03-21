@@ -5,6 +5,38 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
 									std::vector<cv::Point3d>& pts, cv::Mat& reproj_img) {
 
 
+	std::vector<Eigen::Vector3d> pts_svd;
+	// get perspective projection matrix
+    cv::Mat Pl, Pr;
+    Pl = K*(cv::Mat_<double>(3,4) <<1,0,0,0,0,1,0,0,0,0,1,0);
+    cv::hconcat(R, t, Pr);
+    Pr = K*Pr;
+
+    // reconstruct 3d feature points
+    for(unsigned int i=0; i<features0.size(); i++) {
+        float ul = features0[i].x;
+        float vl = features0[i].y;
+        float ur = features1[i].x;
+        float vr = features1[i].y;
+        cv::Mat ul_skew = (cv::Mat_<double>(3,3) << 0, -1, vl, 1, 0, -ul, -vl, ul, 0);
+        cv::Mat ur_skew = (cv::Mat_<double>(3,3) << 0, -1, vr, 1, 0, -ur, -vr, ur, 0);
+        cv::Mat uPl = ul_skew*Pl;
+        cv::Mat uPr = ur_skew*Pr;
+        cv::Mat A, W, U, V;
+        cv::vconcat(uPl, uPr, A);
+        cv::SVDecomp(A, W, U, V, cv::SVD::FULL_UV);
+        cv::transpose(V,V);
+
+        double x = V.at<double>(0,3) / V.at<double>(3,3);
+        double y = V.at<double>(1,3) / V.at<double>(3,3);
+        double z = V.at<double>(2,3) / V.at<double>(3,3);
+  
+	    // cv::waitKey(0);
+	    Eigen::Vector3d p;
+	    p << x, y, z;
+        pts_svd.push_back(p);
+    }
+
 	double fx = K.at<double>(0,0);
 	double fy = K.at<double>(1,1);
 	double cx = K.at<double>(0,2);
@@ -17,16 +49,26 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
 
 	// set up optimizer
 	g2o::SparseOptimizer optimizer;
-    g2o::BlockSolver_6_3::LinearSolverType* linearSolver = new  g2o::LinearSolverCholmod<g2o::BlockSolver_6_3::PoseMatrixType> ();
-    g2o::BlockSolver_6_3* block_solver = new g2o::BlockSolver_6_3( linearSolver );
-    g2o::OptimizationAlgorithmLevenberg* algorithm = new g2o::OptimizationAlgorithmLevenberg( block_solver );
-    optimizer.setAlgorithm( algorithm );
-    optimizer.setVerbose( false );
+    // g2o::BlockSolver_6_3::LinearSolverType* linearSolver = new  g2o::LinearSolverCholmod<g2o::BlockSolver_6_3::PoseMatrixType> ();
+    // g2o::BlockSolver_6_3* block_solver = new g2o::BlockSolver_6_3( linearSolver );
+    // g2o::OptimizationAlgorithmLevenberg* algorithm = new g2o::OptimizationAlgorithmLevenberg( block_solver );
     
+	std::unique_ptr<g2o::BlockSolver_6_3::LinearSolverType> linearSolver;
+	linearSolver = g2o::make_unique<g2o::LinearSolverCholmod<g2o::BlockSolver_6_3::PoseMatrixType>>();
+	g2o::OptimizationAlgorithmLevenberg* algorithm = new g2o::OptimizationAlgorithmLevenberg(
+	    g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
+
+    optimizer.setAlgorithm( algorithm );
+    optimizer.setVerbose( true );
+    
+
+
     // add camera parameters
     g2o::CameraParameters* cam = new g2o::CameraParameters( fx, Eigen::Vector2d(cx, cy), 0 );
     cam->setId(0);
-    optimizer.addParameter( cam );
+	if (!optimizer.addParameter(cam)) {
+		assert(false);
+	}
     
     // add camera0 pose
     g2o::VertexSE3Expmap* v0 = new g2o::VertexSE3Expmap();
@@ -42,52 +84,77 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
     optimizer.addVertex( v1 );
 
     // initialize PointXYZ
-    for ( size_t i=0; i<features0.size(); i++ )
+    std::vector<g2o::EdgeProjectXYZ2UV*> edges;
+    for ( size_t i=0; i<pts_svd.size(); i++ )
     {
         g2o::VertexSBAPointXYZ* v = new g2o::VertexSBAPointXYZ();
         v->setId( 2 + i );
-        double z = 1.0;
-        double x = ( features0[i].x - cx ) * z / fx; 
-        double y = ( features0[i].y - cy ) * z / fy; 
         v->setMarginalized(true);
-        v->setEstimate( Eigen::Vector3d(x,y,z) );
+        v->setEstimate(pts_svd[i]);
         optimizer.addVertex( v );
+
+        // project to feature0
+        g2o::EdgeProjectXYZ2UV*  edge0 = new g2o::EdgeProjectXYZ2UV();
+        edge0->setVertex( 0, dynamic_cast<g2o::VertexSBAPointXYZ*>   (v) );
+        edge0->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (v0) );
+        edge0->setMeasurement( Eigen::Vector2d(features0[i].x, features0[i].y ) );
+        edge0->setInformation( Eigen::Matrix2d::Identity() );
+        edge0->setParameterId(0, 0);
+        edge0->setRobustKernel( new g2o::RobustKernelHuber() );
+        optimizer.addEdge( edge0 );
+        edges.push_back(edge0);
+
+        // project to feature1
+        g2o::EdgeProjectXYZ2UV*  edge1 = new g2o::EdgeProjectXYZ2UV();
+        edge1->setVertex( 0, dynamic_cast<g2o::VertexSBAPointXYZ*>   (v) );
+        edge1->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (v1) );
+        edge1->setMeasurement( Eigen::Vector2d(features1[i].x, features1[i].y ) );
+        edge1->setInformation( Eigen::Matrix2d::Identity() );
+        edge1->setParameterId(0,0);
+        edge1->setRobustKernel( new g2o::RobustKernelHuber() );
+        optimizer.addEdge( edge1 );
+        edges.push_back(edge1);
     }
     
     // add features0 as measurement
-    std::vector<g2o::EdgeProjectXYZ2UV*> edges;
-    for ( size_t i=0; i<features0.size(); i++ )
-    {
-        g2o::EdgeProjectXYZ2UV*  edge = new g2o::EdgeProjectXYZ2UV();
-        edge->setVertex( 0, dynamic_cast<g2o::VertexSBAPointXYZ*>   (optimizer.vertex(i+2)) );
-        edge->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (optimizer.vertex(0)) );
-        edge->setMeasurement( Eigen::Vector2d(features0[i].x, features0[i].y ) );
-        edge->setInformation( Eigen::Matrix2d::Identity() );
-        edge->setParameterId(0, 0);
-        edge->setRobustKernel( new g2o::RobustKernelHuber() );
-        optimizer.addEdge( edge );
-        edges.push_back(edge);
-    }
+    // std::cout<<"features0 size: "<<features0.size()<<std::endl;
+    // std::vector<g2o::EdgeProjectXYZ2UV*> edges;
+    // for ( size_t i=0; i<features0.size(); i++ )
+    // {
+    //     g2o::EdgeProjectXYZ2UV*  edge = new g2o::EdgeProjectXYZ2UV();
+    //     edge->setVertex( 0, dynamic_cast<g2o::VertexSBAPointXYZ*>   (optimizer.vertex(i+2)) );
+    //     edge->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (optimizer.vertex(0)) );
+    //     edge->setMeasurement( Eigen::Vector2d(features0[i].x, features0[i].y ) );
+    //     edge->setInformation( Eigen::Matrix2d::Identity() );
+    //     edge->setParameterId(0, 0);
+    //     edge->setRobustKernel( new g2o::RobustKernelHuber() );
+    //     optimizer.addEdge( edge );
+    //     edges.push_back(edge);
+    // }
 
-    // add features1 as measurement
-    for ( size_t i=0; i<features1.size(); i++ )
-    {
-        g2o::EdgeProjectXYZ2UV*  edge = new g2o::EdgeProjectXYZ2UV();
-        edge->setVertex( 0, dynamic_cast<g2o::VertexSBAPointXYZ*>   (optimizer.vertex(i+2)) );
-        edge->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (optimizer.vertex(1)) );
-        edge->setMeasurement( Eigen::Vector2d(features1[i].x, features1[i].y ) );
-        edge->setInformation( Eigen::Matrix2d::Identity() );
-        edge->setParameterId(0,0);
-        edge->setRobustKernel( new g2o::RobustKernelHuber() );
-        optimizer.addEdge( edge );
-        edges.push_back(edge);
-    }
+    // // add features1 as measurement
+    // std::cout<<"features1 size: "<<features1.size()<<std::endl;
+    // for ( size_t i=0; i<features1.size(); i++ )
+    // {
+    //     g2o::EdgeProjectXYZ2UV*  edge = new g2o::EdgeProjectXYZ2UV();
+    //     edge->setVertex( 0, dynamic_cast<g2o::VertexSBAPointXYZ*>   (optimizer.vertex(i+2)) );
+    //     edge->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (optimizer.vertex(1)) );
+    //     edge->setMeasurement( Eigen::Vector2d(features1[i].x, features1[i].y ) );
+    //     edge->setInformation( Eigen::Matrix2d::Identity() );
+    //     edge->setParameterId(0,0);
+    //     edge->setRobustKernel( new g2o::RobustKernelHuber() );
+    //     optimizer.addEdge( edge );
+    //     edges.push_back(edge);
+    // }
     
+    std::cout<<"start init "<<std::endl;
     // optimizer.setVerbose(true);
     optimizer.initializeOptimization();
-    optimizer.optimize(20);
+    std::cout<<"end init "<<std::endl;
+    optimizer.optimize(10);
+    std::cout<<"end opt "<<std::endl;
     
-    if(optimizer.activeChi2() < 100) {
+    // if(optimizer.activeChi2() < 100) {
 	    g2o::VertexSE3Expmap* v = dynamic_cast<g2o::VertexSE3Expmap*>( optimizer.vertex(1) );
 	    Eigen::Isometry3d pose = v->estimate();
 	    R_eigen = pose.rotation();
@@ -126,38 +193,9 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
 	    // std::cout<<"inliers in total points: "<<inliers<<"/"<<features0.size()+features1.size()<<std::endl;
 	    // optimizer.save("ba.g2o");
 
-    } else {
-    	std::cout<<"BA failed"<<std::endl;
-
-		// get perspective projection matrix
-	    cv::Mat Pl, Pr;
-	    Pl = K*(cv::Mat_<double>(3,4) <<1,0,0,0,0,1,0,0,0,0,1,0);
-	    cv::hconcat(R, t, Pr);
-	    Pr = K*Pr;
-
-	    // reconstruct 3d feature points
-	    for(unsigned int i=0; i<features0.size(); i++) {
-	        float ul = features0[i].x;
-	        float vl = features0[i].y;
-	        float ur = features1[i].x;
-	        float vr = features1[i].y;
-	        cv::Mat ul_skew = (cv::Mat_<double>(3,3) << 0, -1, vl, 1, 0, -ul, -vl, ul, 0);
-	        cv::Mat ur_skew = (cv::Mat_<double>(3,3) << 0, -1, vr, 1, 0, -ur, -vr, ur, 0);
-	        cv::Mat uPl = ul_skew*Pl;
-	        cv::Mat uPr = ur_skew*Pr;
-	        cv::Mat A, W, U, V;
-	        cv::vconcat(uPl, uPr, A);
-	        cv::SVDecomp(A, W, U, V, cv::SVD::FULL_UV);
-	        cv::transpose(V,V);
-
-	        double x = V.at<double>(0,3) / V.at<double>(3,3);
-	        double y = V.at<double>(1,3) / V.at<double>(3,3);
-	        double z = V.at<double>(2,3) / V.at<double>(3,3);
-	  
-		    // cv::waitKey(0);
-	        _pts.push_back(cv::Point3d(x,y,z));
-	    }
-    }
+    // } else 
+    // {
+    // }
 
 	// remove outlier by reproject to left img
 	std::vector<cv::Point2f> _features0 = features0;
