@@ -12,10 +12,15 @@
 
 #include "data.hpp"
 #include "helper.hpp"
-#include "local_KF_edge.hpp"
+
+#include "stereo_camera/pose_estimater.hpp"
 
 class LocalKFOptimizer{
+private:
+	PoseEstimater pose_estimater;
+
+	bool getTransformBetweenKF(const KeyFrame& KF_from, const KeyFrame& KF_to, const CameraModel& cam0, Eigen::Matrix4d& T_mat);
 public:
-	bool optimize(const std::vector<KeyFrame>& keyframes, int KF_count, const CameraModel& cam0, const cv::Mat& cur_img0, const FeaturePoints& cur_fts_pts, Pose& cur_pose);
+	bool optimize(const std::vector<KeyFrame>& keyframes, int KF_count, const CameraModel& cam0);
 
 };

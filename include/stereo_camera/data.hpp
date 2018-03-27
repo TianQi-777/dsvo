@@ -12,7 +12,7 @@
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/plot.hpp>
 
-#define BATCH_SIZE 3
+#define BATCH_SIZE 5
 
 typedef Eigen::Matrix<double, 1, BATCH_SIZE*BATCH_SIZE> ScaleBatch;
 

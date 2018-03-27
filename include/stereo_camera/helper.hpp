@@ -11,6 +11,9 @@
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/plot.hpp>
 #include "data.hpp"
+#include "stereo_camera/pose_edge.hpp"
+
+#define POSE_PYMD 3
 
 static void project3DPtsToImg(const std::vector<cv::Point3d>& pts, double scale, const CameraModel& cam, cv::Mat& proj_img) {
     cv::Mat P01;

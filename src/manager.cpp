@@ -42,8 +42,8 @@ void Manager::imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, 
 	cv_bridge::CvImageConstPtr img0_ptr, img1_ptr;
 	try
 	{
-		img0_ptr = cv_bridge::toCvShare(img0_cptr, img0_cptr->encoding);
-		img1_ptr = cv_bridge::toCvShare(img1_cptr, img1_cptr->encoding);
+		img0_ptr = cv_bridge::toCvShare(img0_cptr, sensor_msgs::image_encodings::BGR8);
+		img1_ptr = cv_bridge::toCvShare(img1_cptr, sensor_msgs::image_encodings::BGR8);
 	}
 	catch (cv_bridge::Exception& e)
 	{
@@ -55,6 +55,8 @@ void Manager::imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, 
 
 	img0_ptr->image.copyTo(cur_img0);
 	img1_ptr->image.copyTo(cur_img1);
+	cv::cvtColor(cur_img0, cur_img0, CV_BGR2GRAY);
+	cv::cvtColor(cur_img1, cur_img1, CV_BGR2GRAY);
 
 	stereo_cam->track(state, cur_img0, cur_img1, img0_cptr->header.stamp);
 

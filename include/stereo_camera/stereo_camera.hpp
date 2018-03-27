@@ -47,6 +47,7 @@ private:
 	Reconstructor reconstructor;
 	ScaleOptimizer scale_optimizer;
 	LocalKFOptimizer local_KF_optimizer;
+	PoseEstimater pose_estimater;
 
 	int frame_dropped_count;
 	// shared_ptr<DirectSolver> directSolver_ptr;
@@ -60,7 +61,8 @@ private:
 
 	void featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::Mat& cur_img, const cv::Mat& K, FeatureTrackingResult& feature_tracking_result);
 
-	void propagateState(State& cur_state, double cur_time, const KeyFrame& lastKF, const std::vector<cv::Point2f>& cur_features, const CameraModel& cam);
+	void propagateState(State& cur_state, const cv::Mat& cur_img, double cur_time, const KeyFrame& lastKF, const std::vector<cv::Point2f>& cur_features, const CameraModel& cam);
+	// void propagateState(State& cur_state, double cur_time, const KeyFrame& lastKF, const std::vector<cv::Point2f>& cur_features, const CameraModel& cam);
 
 	bool reconstructAndOptimize(FeatureTrackingResult feature_result, const KeyFrame& lastKF, 
 								const CameraModel& cam0, const CameraModel& cam1,

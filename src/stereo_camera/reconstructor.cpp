@@ -59,7 +59,7 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
 	    g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
 
     optimizer.setAlgorithm( algorithm );
-    optimizer.setVerbose( true );
+    optimizer.setVerbose( false );
     
 
 
@@ -116,43 +116,9 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
         edges.push_back(edge1);
     }
     
-    // add features0 as measurement
-    // std::cout<<"features0 size: "<<features0.size()<<std::endl;
-    // std::vector<g2o::EdgeProjectXYZ2UV*> edges;
-    // for ( size_t i=0; i<features0.size(); i++ )
-    // {
-    //     g2o::EdgeProjectXYZ2UV*  edge = new g2o::EdgeProjectXYZ2UV();
-    //     edge->setVertex( 0, dynamic_cast<g2o::VertexSBAPointXYZ*>   (optimizer.vertex(i+2)) );
-    //     edge->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (optimizer.vertex(0)) );
-    //     edge->setMeasurement( Eigen::Vector2d(features0[i].x, features0[i].y ) );
-    //     edge->setInformation( Eigen::Matrix2d::Identity() );
-    //     edge->setParameterId(0, 0);
-    //     edge->setRobustKernel( new g2o::RobustKernelHuber() );
-    //     optimizer.addEdge( edge );
-    //     edges.push_back(edge);
-    // }
-
-    // // add features1 as measurement
-    // std::cout<<"features1 size: "<<features1.size()<<std::endl;
-    // for ( size_t i=0; i<features1.size(); i++ )
-    // {
-    //     g2o::EdgeProjectXYZ2UV*  edge = new g2o::EdgeProjectXYZ2UV();
-    //     edge->setVertex( 0, dynamic_cast<g2o::VertexSBAPointXYZ*>   (optimizer.vertex(i+2)) );
-    //     edge->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (optimizer.vertex(1)) );
-    //     edge->setMeasurement( Eigen::Vector2d(features1[i].x, features1[i].y ) );
-    //     edge->setInformation( Eigen::Matrix2d::Identity() );
-    //     edge->setParameterId(0,0);
-    //     edge->setRobustKernel( new g2o::RobustKernelHuber() );
-    //     optimizer.addEdge( edge );
-    //     edges.push_back(edge);
-    // }
-    
-    std::cout<<"start init "<<std::endl;
     // optimizer.setVerbose(true);
     optimizer.initializeOptimization();
-    std::cout<<"end init "<<std::endl;
     optimizer.optimize(10);
-    std::cout<<"end opt "<<std::endl;
     
     // if(optimizer.activeChi2() < 100) {
 	    g2o::VertexSE3Expmap* v = dynamic_cast<g2o::VertexSE3Expmap*>( optimizer.vertex(1) );

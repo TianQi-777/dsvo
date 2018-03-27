@@ -1,3 +1,6 @@
+#ifndef POSE_EDGE_HPP
+#define POSE_EDGE_HPP
+
 #include <Eigen/Geometry>
 #include <opencv2/core/core.hpp>
 #include <g2o/core/block_solver.h>
@@ -14,12 +17,12 @@
 #include <g2o/solvers/dense/linear_solver_dense.h>
 #include "helper.hpp"
 
-class EdgeLocalKF:public g2o::BaseUnaryEdge<1, ScaleBatch, g2o::VertexSE3Expmap>
+class PoseEdge:public g2o::BaseUnaryEdge<1, ScaleBatch, g2o::VertexSE3Expmap>
 {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-	EdgeLocalKF(const Eigen::Vector3d& point, const Eigen::Matrix3d& K, const cv::Mat& img)
+	PoseEdge(const Eigen::Vector3d& point, const Eigen::Matrix3d& K, const cv::Mat& img)
 	: start_point(point), fx(K(0,0)), fy(K(1,1)), cx(K(0,2)), cy(K(1,2)), dest_img(img)
 	{}
 
@@ -46,3 +49,4 @@ private:
 	const cv::Mat& dest_img;
 };
 
+#endif

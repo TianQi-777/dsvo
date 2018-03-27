@@ -45,7 +45,7 @@ plot(vot, voc, 'r*-');
 gtp = gt(:,2:4);
 vop = vo(:,2:4);
 figure('Name','traj')
-plot3(gtp(:,1), gtp(:,2), gtp(:,3), 'g->')
+plot3(gtp(:,1), gtp(:,2), gtp(:,3), 'g-')
 % hold on
 figure('Name','traj1')
-plot3(vop(:,1), vop(:,2), vop(:,3), 'r->')
+plot3(vop(:,1), vop(:,2), vop(:,3), 'r-')

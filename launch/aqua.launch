@@ -1,0 +1,11 @@
+<launch>
+
+	<rosparam command="load" file="$(env HOME)/workspace/data/bags/stereo/aqua/cam0.yaml" ns="/cam0"/>
+	<rosparam command="load" file="$(env HOME)/workspace/data/bags/stereo/aqua/cam1.yaml" ns="/cam1"/>
+
+	 <node name="manager_node" pkg="direct_stereo" type="manager_node" output="screen" >
+	    <param name="cam0_topic" value="/camera_front_left/image_raw" />
+	    <param name="cam1_topic" value="/camera_front_right/image_raw" />
+    </node>
+
+</launch>

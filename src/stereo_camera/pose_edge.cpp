@@ -1,11 +1,11 @@
-#include "stereo_camera/local_KF_edge.hpp"
+#include "stereo_camera/pose_edge.hpp"
 #include <g2o/core/factory.h>
 
 #include <iostream>
 using namespace std;
 
 
-void EdgeLocalKF::computeError()
+void PoseEdge::computeError()
 {
 	const g2o::VertexSE3Expmap* vtx = static_cast<const g2o::VertexSE3Expmap*> (_vertices[0]);
 	Eigen::Vector3d proj_point = vtx->estimate().map(start_point);
@@ -29,7 +29,7 @@ void EdgeLocalKF::computeError()
 	}
 }
 
-void EdgeLocalKF::linearizeOplus()
+void PoseEdge::linearizeOplus()
 {
 	if ( level() == 1 )
     {
