@@ -18,8 +18,13 @@ Manager::Manager() {
 		ROS_INFO("Fail to get cameras parameters, exit.");
         return;
 	}
+
+	// ground truth type
+	string gt_type = "";
+	nhPriv.getParam("gt_type", gt_type);
 	stereo_cam = boost::shared_ptr<StereoCamera>(new StereoCamera(T_BS0, K0, frame_size0, dist_coeff0,
-																  T_BS1, K1, frame_size1, dist_coeff1));
+																  T_BS1, K1, frame_size1, dist_coeff1,
+																  gt_type));
 
 	// sensor topics
 	std::string cam0_topic, cam1_topic;
@@ -30,8 +35,8 @@ Manager::Manager() {
         return;
 	}
 
-	cam0_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, cam0_topic, 1000);
-	cam1_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, cam1_topic, 1000);
+	cam0_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, cam0_topic, 200);
+	cam1_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, cam1_topic, 200);
 
 	sync = new message_filters::Synchronizer<StereoSyncPolicy>(StereoSyncPolicy(10), *cam0_sub, *cam1_sub);
 	sync->registerCallback(boost::bind(&Manager::imageMessageCallback, this, _1, _2));

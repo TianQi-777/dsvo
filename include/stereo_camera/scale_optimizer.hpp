@@ -17,12 +17,11 @@
 
 class ScaleOptimizer{
 public:
-	bool optimize(const std::vector<cv::Point2f>& fts, const std::vector<cv::Point3d>& pts, double& scale, 
+	bool optimize(const std::vector<cv::Point2f>& fts, std::vector<PointWithUncertainty>& pts, double& scale, 
 				  const CameraModel& cam1, const cv::Mat& img0, const cv::Mat& img1, int pymd, int max_opt_step); 
 	
-	bool optimize_pymd(const std::vector<cv::Point2f>& fts, const std::vector<Eigen::Vector3d>& pts, double& scale, 
-					   const cv::Mat& img0, const cv::Mat& img1, double tx, const Eigen::Matrix3d& K1, int max_opt_step); 
+	bool optimize_pymd(const std::vector<cv::Point2f>& fts, const std::vector<Eigen::Vector3d>& pts, std::vector<double>& uncertaintys, 
+					   double& scale, const cv::Mat& img0, const cv::Mat& img1, double tx, const Eigen::Matrix3d& K1, int max_opt_step); 
 
-	bool localLoopOptimization(const std::vector<KeyFrame>& keyframes, int KF_count, const CameraModel& cam0, const cv::Mat& cur_img0, const FeaturePoints& cur_fts_pts, Pose& cur_pose);
 
 };

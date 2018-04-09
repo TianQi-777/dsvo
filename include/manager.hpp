@@ -7,7 +7,6 @@
 #include <sensor_msgs/Image.h>
 
 #include "stereo_camera/stereo_camera.hpp"
-#include "comparer.hpp"
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> StereoSyncPolicy;
 
@@ -21,8 +20,6 @@ private:
 	message_filters::Subscriber<sensor_msgs::Image> *cam0_sub;
 	message_filters::Subscriber<sensor_msgs::Image> *cam1_sub;
 	message_filters::Synchronizer<StereoSyncPolicy> *sync;
-
-	Comparer comparer;
 
 	void imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, const sensor_msgs::ImageConstPtr& img1_cptr);
 

@@ -9,18 +9,20 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/plot.hpp>
+#include "g2o/solvers/eigen/linear_solver_eigen.h"
 
 #include "data.hpp"
 #include "helper.hpp"
 
 #include "stereo_camera/pose_estimater.hpp"
+#include "stereo_camera/edge_se3m.h"
 
 class LocalKFOptimizer{
 private:
 	PoseEstimater pose_estimater;
 
-	bool getTransformBetweenKF(const KeyFrame& KF_from, const KeyFrame& KF_to, const CameraModel& cam0, Eigen::Matrix4d& T_mat);
+	double getTransformBetweenKF(const KeyFrame& KF_from, const KeyFrame& KF_to, const CameraModel& cam0, Eigen::Isometry3d& T);
 public:
-	bool optimize(const std::vector<KeyFrame>& keyframes, int KF_count, const CameraModel& cam0);
+	bool optimize(std::vector<KeyFrame>& keyframes, int KF_count, const CameraModel& cam0);
 
 };

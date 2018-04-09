@@ -6,6 +6,7 @@ set( CMAKE_CXX_FLAGS "-std=c++11" )
 
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
+  image_transport
   message_filters
   dynamic_reconfigure
   roscpp
@@ -13,7 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 generate_dynamic_reconfigure_options(
-  cfg/DirectStereoConfig.cfg
+  cfg/DirectStereo.cfg
 )
 
 LIST( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules )
@@ -28,7 +29,9 @@ catkin_package()
 
 include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS} include)
 
-add_executable(manager_node src/manager_node.cpp src/manager.cpp src/state.cpp src/comparer.cpp src/stereo_camera/stereo_camera.cpp src/stereo_camera/reconstructor.cpp src/stereo_camera/scale_edge.cpp src/stereo_camera/scale_optimizer.cpp src/stereo_camera/local_KF_optimizer.cpp src/stereo_camera/pose_edge.cpp src/stereo_camera/pose_estimater.cpp)
+add_executable(manager_node src/manager_node.cpp src/manager.cpp src/state.cpp src/comparers/comparer.cpp src/comparers/odom_comparer.cpp src/comparers/point_comparer.cpp src/comparers/trans_comparer.cpp src/stereo_camera/stereo_camera.cpp src/stereo_camera/reconstructor.cpp src/stereo_camera/scale_edge.cpp src/stereo_camera/scale_optimizer.cpp src/stereo_camera/local_KF_optimizer.cpp src/stereo_camera/pose_edge.cpp src/stereo_camera/pose_estimater.cpp src/stereo_camera/edge_se3m.cpp)
+
+add_executable(zed_split src/stereo_camera/zed_split.cpp)
 
 add_dependencies(manager_node ${PROJECT_NAME}_gencfg)
 
@@ -38,4 +41,10 @@ target_link_libraries(manager_node
   ${CSPARSE_LIBRARY}
   ${CHOLMOD_LIBRARIES}
   g2o_core g2o_types_slam3d g2o_solver_csparse csparse g2o_stuff g2o_csparse_extension g2o_types_sba cholmod
+)
+
+
+target_link_libraries(zed_split 
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
 )

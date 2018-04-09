@@ -18,14 +18,14 @@ void projAndDrawPts(const std::vector<cv::Point3f>& points, const cv::Mat& img, 
     // std::cout<<"rvec"<<rvec<<std::endl<<"t"<<t<<std::endl;
 }
 
-bool LocalKFOptimizer::optimize(const std::vector<KeyFrame>& keyframes, int KF_count, const CameraModel& cam0) {
+bool LocalKFOptimizer::optimize(std::vector<KeyFrame>& keyframes, int KF_count, const CameraModel& cam0) {
 	if(keyframes.size()-1 < KF_count) return false;
 
-	std::unique_ptr<g2o::BlockSolver<g2o::BlockSolverTraits<6,6>>::LinearSolverType> linearSolver;
-	linearSolver = g2o::make_unique<g2o::LinearSolverCholmod<g2o::BlockSolver<g2o::BlockSolverTraits<6,6>>::PoseMatrixType>>();
+	std::unique_ptr<g2o::BlockSolver_6_3::LinearSolverType> linearSolver;
+	linearSolver = g2o::make_unique<g2o::LinearSolverCholmod<g2o::BlockSolver_6_3::PoseMatrixType>>();
 	// linearSolver->setBlockOrdering(false);
 	g2o::OptimizationAlgorithmLevenberg* algorithm = new g2o::OptimizationAlgorithmLevenberg(
-	    g2o::make_unique<g2o::BlockSolver<g2o::BlockSolverTraits<6,6>>>(std::move(linearSolver)));
+	    g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
 
 	g2o::SparseOptimizer optimizer;
 	optimizer.setAlgorithm(algorithm);
@@ -35,7 +35,7 @@ bool LocalKFOptimizer::optimize(const std::vector<KeyFrame>& keyframes, int KF_c
 	int base_KF_idx = keyframes.size()-1-KF_count;
 
 	// add base_KF to optimizer, set as fixed
-	KeyFrame base_KF = keyframes[base_KF_idx];
+	KeyFrame& base_KF = keyframes[base_KF_idx];
 	g2o::VertexSE3 *last_KF_v = new g2o::VertexSE3();
 	last_KF_v->setId(0);
 	last_KF_v->setFixed(true);
@@ -43,7 +43,7 @@ bool LocalKFOptimizer::optimize(const std::vector<KeyFrame>& keyframes, int KF_c
 	optimizer.addVertex(last_KF_v);
 
 	// add rest KF vertex, as well as edge to base KF
-	std::vector<g2o::EdgeSE3*> edges;
+	std::vector<g2o::EdgeSE3M*> edges;
 	for(int i=1; i<=KF_count; i++) {
 		KeyFrame kf_i = keyframes[base_KF_idx + i];
 
@@ -52,52 +52,52 @@ bool LocalKFOptimizer::optimize(const std::vector<KeyFrame>& keyframes, int KF_c
 		kf_i_v->setId(i);
 		kf_i_v->setEstimate(g2o::SE3Quat(kf_i.pose.orientation.toRotationMatrix(), kf_i.pose.position));
 		optimizer.addVertex(kf_i_v);
-
 		//add edges to optimizer
 		for(int j=0; j<i; j++) {
-			KeyFrame kf_j = keyframes[base_KF_idx + j];
+			KeyFrame& kf_j = keyframes[base_KF_idx+j];
 
-			Eigen::Matrix4d T_mat;
-			getTransformBetweenKF(kf_i, kf_j, cam0, T_mat);
+			Eigen::Isometry3d T;
+			double dist = getTransformBetweenKF(kf_i, kf_j, cam0, T);
 
-		    g2o::EdgeSE3* e = new g2o::EdgeSE3();
+		    g2o::EdgeSE3M* e = new g2o::EdgeSE3M();
 		    e->setVertex(1, kf_i_v);
 		    e->setVertex(0, optimizer.vertex(j));
-		    Eigen::Matrix<double, 6, 6> information = 100.0*Eigen::Matrix< double, 6,6 >::Identity();
+		    Eigen::Matrix<double, 6, 6> information = Eigen::Matrix< double, 6,6 >::Identity();
+        	information(0,0) = information(1,1) = information(2,2) = dist;
+	        information(3,3) = information(4,4) = information(5,5) = dist;
 		    e->setInformation(information);
-			e->setMeasurement(g2o::Isometry3(T_mat));
+			e->setMeasurement(T);
 			// e->setMeasurementFromState();
+			optimizer.addEdge(e);
 			edges.push_back(e);
 		}
 
 	}
 
-	for(int k=0; k<edges.size(); k++) {
-			optimizer.addEdge(edges[k]);
-	}
-
-	optimizer.setVerbose(true);
+	// optimizer.setVerbose(true);
     optimizer.initializeOptimization();
-	// std::cout<<"Saving..."<<std::endl;
-    // cv::waitKey();
     // optimizer.save("/home/jiawei/Desktop/result_before.g2o");
+    // cv::waitKey();
     optimizer.optimize( 10 ); 
     // optimizer.save( "/home/jiawei/Desktop/result_after.g2o" );
 
-	g2o::VertexSE3* vertex = dynamic_cast<g2o::VertexSE3*>(optimizer.vertex(0));
-	Eigen::Isometry3d pose = vertex->estimate();
+	// write back to KFs
+	for(int i=0; i<KF_count; i++) {
+		KeyFrame& kf_i = keyframes[base_KF_idx+i];
 
-	// write back to last_KF.pose
-	// KF_from.pose.position = pose.translation();
-	// Eigen::Matrix3d cur_R = pose.rotation();
-	// Eigen::Quaterniond cur_q(cur_R);
-	// KF_from.pose.orientation = cur_q;
+		g2o::VertexSE3* vertex = dynamic_cast<g2o::VertexSE3*>(optimizer.vertex(i));
+		Eigen::Isometry3d pose = vertex->estimate();
 
+		kf_i.pose.position = pose.translation();
+		Eigen::Matrix3d cur_R = pose.rotation();
+		Eigen::Quaterniond cur_q(cur_R);
+		kf_i.pose.orientation = cur_q;
+	}
 	return true;
 
 }
 
-bool LocalKFOptimizer::getTransformBetweenKF(const KeyFrame& KF_from, const KeyFrame& KF_to, const CameraModel& cam0, Eigen::Matrix4d& T_mat) {
+double LocalKFOptimizer::getTransformBetweenKF(const KeyFrame& KF_from, const KeyFrame& KF_to, const CameraModel& cam0, Eigen::Isometry3d& T) {
 	if(KF_from.feature_points.points.size() < 10) return false; //too few points
 
 	Eigen::Matrix3d R_from2to = cam0.R_B2C * KF_to.pose.orientation.toRotationMatrix().transpose() * KF_from.pose.orientation.toRotationMatrix() * cam0.R_C2B;
@@ -108,13 +108,17 @@ bool LocalKFOptimizer::getTransformBetweenKF(const KeyFrame& KF_from, const KeyF
 
 	// t_from2to(0) += 0.1;
 	// projAndDrawPts(KF_from.feature_points.points, KF_to.img0, cam0.K, R_from2to, t_from2to, "local loop before");
-	pose_estimater.poseEstimate(KF_from.feature_points, KF_from.img0, cam0.K, KF_to.img0, 4, R_from2to, t_from2to);
+	double dist = pose_estimater.poseEstimate(KF_from.feature_points, KF_from.img0, cam0.K, KF_to.img0, 4, R_from2to, t_from2to);
 	// projAndDrawPts(KF_from.feature_points.points, KF_to.img0, cam0.K, R_from2to, t_from2to, "local loop after");
 
 	Eigen::Matrix3d R = cam0.R_C2B * R_from2to * cam0.R_B2C;
 	Eigen::Vector3d t = cam0.R_C2B * R_from2to * cam0.t_B2C + cam0.R_C2B * t_from2to + cam0.t_C2B;
-	T_mat = Eigen::Matrix4d::Identity();
-	T_mat.block<3,3>(0,0) = R;
-	T_mat.block<3,1>(0,3) = t;
-	return true;
+	Eigen::AngleAxisd angle(R);
+	T = Eigen::Isometry3d::Identity();
+	T =  angle;
+    T(0,3) = t(0); 
+    T(1,3) = t(1); 
+    T(2,3) = t(2);
+
+	return dist;
 }

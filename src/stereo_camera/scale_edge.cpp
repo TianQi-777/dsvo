@@ -29,6 +29,7 @@ void EdgeScaleDirect::computeError()
 	getBatchAround(img1,u,v,batch);
 	// cout<<"batch= "<<batch<<endl<<" _measurement= "<<_measurement<<endl;
 	_error(0,0) = (batch - _measurement).sum() / BATCH_SIZE / BATCH_SIZE;
+	// _error(0,0) = (batch - _measurement).sum() / BATCH_SIZE / BATCH_SIZE + 1.0 / scale_inv / scale_inv;
 	// cout<<"error "<<_error(0)<<endl;
 	
 }

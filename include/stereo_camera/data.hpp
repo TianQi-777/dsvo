@@ -26,6 +26,17 @@ struct StereoModel
 	cv::Mat t;
 };
 
+struct PointWithUncertainty
+{
+	cv::Point3d point;
+	double uncertainty;
+
+	PointWithUncertainty(const cv::Point3d& p, double u) {
+		point = p;
+		uncertainty = u;
+	}
+};
+
 struct FeaturePoints
 {
 	std::vector<cv::Point2f> features;

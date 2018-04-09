@@ -16,6 +16,7 @@
 #define POSE_PYMD 3
 
 static void project3DPtsToImg(const std::vector<cv::Point3d>& pts, double scale, const CameraModel& cam, cv::Mat& proj_img) {
+	int marker_size = proj_img.rows / 50;
     cv::Mat P01;
     cv::hconcat(cam.stereo.R, cam.stereo.t, P01);
     P01 = cam.K*P01;
@@ -26,7 +27,7 @@ static void project3DPtsToImg(const std::vector<cv::Point3d>& pts, double scale,
         double u = u1.at<double>(0,0) / u1.at<double>(2,0);
         double v = u1.at<double>(1,0) / u1.at<double>(2,0);
         if(0<=u && u<proj_img.cols && 0<=v && v<proj_img.rows) {
-	        cv::drawMarker(proj_img, cv::Point2d(u, v), cv::Scalar(0,0,255), cv::MARKER_CROSS, 4);
+	        cv::drawMarker(proj_img, cv::Point2d(u, v), cv::Scalar(0,0,255), cv::MARKER_CROSS, marker_size);
 	    }
 	}
 }

@@ -1,4 +1,5 @@
-#include "direct_stereo/DirectStereoConfig.h"
+#include <dynamic_reconfigure/server.h>
+#include <direct_stereo/DirectStereoConfig.h>
 #include "data.hpp"
 #include "helper.hpp"
 #include "reconstructor.hpp"
@@ -16,20 +17,26 @@
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/plot.hpp>
 #include <dynamic_reconfigure/server.h>
-// #include <pcl_ros/point_cloud.h>
+#include <pcl_ros/point_cloud.h>
 #include <geometry_msgs/PoseStamped.h>
 #include "geometry_msgs/PointStamped.h"
 #include "state.hpp"
 #include <string>
 #include <ctime>
 
-// typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
+#include "comparers/comparer.hpp"
+#include "comparers/odom_comparer.hpp"
+#include "comparers/point_comparer.hpp"
+#include "comparers/trans_comparer.hpp"
+
+typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
 
 class StereoCamera
 {
 private:
 	ros::NodeHandle nh;
-	// ros::Publisher pcl_pub;
+	ros::Publisher direct_pcl_pub;
+	ros::Publisher stereo_pcl_pub;
 	ros::Publisher pose_pub;
 	dynamic_reconfigure::Server<direct_stereo::DirectStereoConfig> server;
 	dynamic_reconfigure::Server<direct_stereo::DirectStereoConfig>::CallbackType f;
@@ -43,15 +50,21 @@ private:
 	double last_time;
 	bool param_changed;
 	double init_time;
+	cv::Mat cam0_Q;	//comparison with stereo match
 
 	Reconstructor reconstructor;
 	ScaleOptimizer scale_optimizer;
 	LocalKFOptimizer local_KF_optimizer;
 	PoseEstimater pose_estimater;
 
+	Comparer* comparer;
+	std::ofstream time_ofs;
+
 	int frame_dropped_count;
 	// shared_ptr<DirectSolver> directSolver_ptr;
 
+	void testStereoMatch(const cv::Mat& cur_img0, const cv::Mat& cur_img1, const CameraModel& cam0);
+	
 	void truth_Callback(const geometry_msgs::PointStamped::ConstPtr& msg);
 		
 	void monoTrack(State& cur_state, ros::Time cur_time_ros, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const CameraModel& cam0, const CameraModel& cam1,
@@ -61,7 +74,7 @@ private:
 
 	void featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::Mat& cur_img, const cv::Mat& K, FeatureTrackingResult& feature_tracking_result);
 
-	void propagateState(State& cur_state, const cv::Mat& cur_img, double cur_time, const KeyFrame& lastKF, const std::vector<cv::Point2f>& cur_features, const CameraModel& cam);
+	double propagateState(State& cur_state, const cv::Mat& cur_img, double cur_time, const KeyFrame& lastKF, const std::vector<cv::Point2f>& cur_features, const CameraModel& cam);
 	// void propagateState(State& cur_state, double cur_time, const KeyFrame& lastKF, const std::vector<cv::Point2f>& cur_features, const CameraModel& cam);
 
 	bool reconstructAndOptimize(FeatureTrackingResult feature_result, const KeyFrame& lastKF, 
@@ -75,7 +88,8 @@ public:
 			     const std::vector<double>& E1, 
 			     const std::vector<double>& K1, 
 			     const std::vector<double>& frame_size1, 
-			     const std::vector<double>& dist_coeff1);
+			     const std::vector<double>& dist_coeff1,
+			     const string& gt_type);
 	
 	void updateConfig(direct_stereo::DirectStereoConfig &config, uint32_t level);
 

@@ -1,0 +1,45 @@
+!!python/object/new:dynamic_reconfigure.encoding.Config
+dictitems:
+  BA_MAX_STEP: 10
+  BLUR_SZ: 3
+  BLUR_VAR: 1.0
+  INIT_MAX_KP: 100
+  KP_BLOCKS: 3
+  LOOP_CLOSURE: false
+  MAX_REPROJ_DIST: 3
+  MIN_FEATURE_DIST: 10
+  MONO_INLIER_THRES: 0.7
+  PROP_POSE_PYMD: 3
+  QUAL_LEVEL: 0.1
+  SCALE_MAX_STEP: 100
+  SCALE_PYMD: 3
+  TIME_DEBUG: false
+  TIME_LOG: false
+  groups: !!python/object/new:dynamic_reconfigure.encoding.Config
+    dictitems:
+      BA_MAX_STEP: 10
+      BLUR_SZ: 3
+      BLUR_VAR: 1.0
+      INIT_MAX_KP: 100
+      KP_BLOCKS: 3
+      LOOP_CLOSURE: false
+      MAX_REPROJ_DIST: 3
+      MIN_FEATURE_DIST: 10
+      MONO_INLIER_THRES: 0.7
+      PROP_POSE_PYMD: 3
+      QUAL_LEVEL: 0.1
+      SCALE_MAX_STEP: 100
+      SCALE_PYMD: 3
+      TIME_DEBUG: false
+      TIME_LOG: false
+      groups: !!python/object/new:dynamic_reconfigure.encoding.Config
+        state: []
+      id: 0
+      name: Default
+      parameters: !!python/object/new:dynamic_reconfigure.encoding.Config
+        state: []
+      parent: 0
+      state: true
+      type: ''
+    state: []
+state: []

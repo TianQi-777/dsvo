@@ -23,7 +23,6 @@ void State::showPose() {
 
 	// publish pose
 	geometry_msgs::PoseStamped pose;
-
 	pose.header.frame_id = "/map";
 	pose.header.stamp = time;
 

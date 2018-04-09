@@ -1,13 +1,18 @@
 #include "stereo_camera/scale_optimizer.hpp"
 
-bool ScaleOptimizer::optimize(const std::vector<cv::Point2f>& fts, const std::vector<cv::Point3d>& pts, double& scale, 
+bool ScaleOptimizer::optimize(const std::vector<cv::Point2f>& fts, std::vector<PointWithUncertainty>& pts, double& scale, 
 						 const CameraModel& cam1, const cv::Mat& img0, const cv::Mat& img1, int pymd, int max_opt_step) 
 {
 	std::vector<Eigen::Vector3d> pts_eigen;
+	std::vector<cv::Point3d> pts_cv;
+	std::vector<double> uncertaintys;
 	for(int i=0; i<pts.size(); i++) {
 		Eigen::Vector3d tmp;
-		tmp << pts[i].x, pts[i].y, pts[i].z;
+		tmp << pts[i].point.x, pts[i].point.y, pts[i].point.z;
 		pts_eigen.push_back(tmp);
+		uncertaintys.push_back(pts[i].uncertainty);
+
+		pts_cv.push_back(pts[i].point);
 	}
 
 	// create pymd 
@@ -42,24 +47,33 @@ bool ScaleOptimizer::optimize(const std::vector<cv::Point2f>& fts, const std::ve
 
 	for(int i=pymd-1; i>=0; i--)
 	{
-		if(!optimize_pymd(fts_pymd[i], pts_eigen, scale, img0_pymd[i], img1_pymd[i], cam1.stereo.t.at<double>(0,0), K1_pymd[i], max_opt_step)) return false;
+		// cv::Mat proj_img = img1.clone();
+		// project3DPtsToImg(pts_cv, scale, cam1,proj_img);
+		// cv::imshow("Scale projection", proj_img);
+		// cv::waitKey();
+		if(!optimize_pymd(fts_pymd[i], pts_eigen, uncertaintys, scale, img0_pymd[i], img1_pymd[i], cam1.stereo.t.at<double>(0,0), K1_pymd[i], max_opt_step)) return false;
+	}
+
+	// cv::Mat proj_img = img1.clone();
+	// project3DPtsToImg(pts_cv, scale, cam1,proj_img);
+	// cv::imshow("Scale projection", proj_img);
+	// cv::waitKey();
+
+	for(int i=0; i<pts.size(); i++) {
+		pts[i].uncertainty = uncertaintys[i];
 	}
 
 	return true;
 
 }
 
-bool ScaleOptimizer::optimize_pymd(const std::vector<cv::Point2f>& fts, const std::vector<Eigen::Vector3d>& pts, double& scale, 
-							  const cv::Mat& img0, const cv::Mat& img1, double tx, const Eigen::Matrix3d& K1, int max_opt_step) 
+bool ScaleOptimizer::optimize_pymd(const std::vector<cv::Point2f>& fts, const std::vector<Eigen::Vector3d>& pts, std::vector<double>& uncertaintys, 
+								   double& scale, const cv::Mat& img0, const cv::Mat& img1, double tx, const Eigen::Matrix3d& K1, int max_opt_step) 
 {
 	// optimize scale inverse for speed
 	double scale_inv = 1.0/scale;
 
 	g2o::SparseOptimizer optimizer;
-	// ScaleLinearSolver* linearSolver = new ScaleLinearSolver();
-	// ScaleBlockSolver* solver_ptr = new ScaleBlockSolver(linearSolver);
-	// g2o::OptimizationAlgorithmLevenberg* algorithm = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
-
 	std::unique_ptr<ScaleBlockSolver::LinearSolverType> linearSolver;
 	linearSolver = g2o::make_unique<ScaleLinearSolver>();
 	g2o::OptimizationAlgorithmLevenberg* algorithm = new g2o::OptimizationAlgorithmLevenberg(
@@ -73,17 +87,24 @@ bool ScaleOptimizer::optimize_pymd(const std::vector<cv::Point2f>& fts, const st
 	v->setId(0);
 	optimizer.addVertex(v);
 
+	std::vector<EdgeScaleDirect*> edges;
 	for(int i=0; i<pts.size(); i++) {
 		EdgeScaleDirect* e = new EdgeScaleDirect(pts[i], K1, tx, img1);
 		e->setVertex(0, v);
 		ScaleBatch batch;
 		getBatchAround(img0, fts[i].x, fts[i].y, batch);
 		e->setMeasurement(batch);
-		e->setInformation(Eigen::Matrix<double,1,1>::Identity());
+		e->setInformation(uncertaintys[i]*Eigen::Matrix<double,1,1>::Identity());
 	    e->setRobustKernel( new g2o::RobustKernelHuber() );
 		e->setId(i+1);
 
 		optimizer.addEdge(e);
+		edges.push_back(e);
+	}
+
+	for(int i=0; i<pts.size(); i++) {
+		edges[i]->computeError();
+		uncertaintys[i] = edges[i]->chi2();
 	}
 
 	optimizer.initializeOptimization();
