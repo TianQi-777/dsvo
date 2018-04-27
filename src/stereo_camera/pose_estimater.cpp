@@ -1,6 +1,6 @@
 #include "stereo_camera/pose_estimater.hpp"
 
-double PoseEstimater::poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, const std::vector<cv::Point2f>& fts, const cv::Mat& source_img, const cv::Mat& dest_img, const Eigen::Matrix3d& K, Eigen::Matrix3d& R, Eigen::Vector3d& t){
+double PoseEstimater::poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, const std::vector<cv::Point2f>& fts, const cv::Mat& source_img, const cv::Mat& dest_img, const Eigen::Matrix3d& K, Eigen::Matrix3d& R, Eigen::Vector3d& t, int iter){
 	g2o::SparseOptimizer poseOptimizer;
 
 	// g2o::BlockSolver<g2o::BlockSolverTraits<6,1>>::LinearSolverType* linearSolver = new g2o::LinearSolverDense<g2o::BlockSolver<g2o::BlockSolverTraits<6,1>>::PoseMatrixType>();
@@ -43,7 +43,7 @@ double PoseEstimater::poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, 
 	return poseOptimizer.activeChi2();
 }
 
-double PoseEstimater::poseEstimate(const FeaturePoints& fts_pts, const cv::Mat& source_img, const cv::Mat& K, const cv::Mat& dest_img, int pymd, Eigen::Matrix3d& R, Eigen::Vector3d& t){
+double PoseEstimater::poseEstimate(const FeaturePoints& fts_pts, const cv::Mat& source_img, const cv::Mat& K, const cv::Mat& dest_img, int pymd, int iter, Eigen::Matrix3d& R, Eigen::Vector3d& t){
 	//TODO: multi-thread
 	std::vector<Eigen::Vector3d> pts_eigen;
 	for(int i=0; i<fts_pts.points.size(); i++) {
@@ -85,7 +85,7 @@ double PoseEstimater::poseEstimate(const FeaturePoints& fts_pts, const cv::Mat& 
 	double dist = 0.0;
 	for(int i=pymd-1; i>=0; i--)
 	{
-		dist = poseEstimatePymd(pts_eigen, fts_pymd[i], source_img_pymd[i], dest_img_pymd[i], K_pymd[i], R, t);
+		dist = poseEstimatePymd(pts_eigen, fts_pymd[i], source_img_pymd[i], dest_img_pymd[i], K_pymd[i], R, t, iter);
 	}
 
 	assert(dist>0.0);

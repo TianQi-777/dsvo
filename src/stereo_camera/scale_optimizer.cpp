@@ -94,7 +94,7 @@ bool ScaleOptimizer::optimize_pymd(const std::vector<cv::Point2f>& fts, const st
 		ScaleBatch batch;
 		getBatchAround(img0, fts[i].x, fts[i].y, batch);
 		e->setMeasurement(batch);
-		e->setInformation(uncertaintys[i]*Eigen::Matrix<double,1,1>::Identity());
+		e->setInformation(1.0/uncertaintys[i]*Eigen::Matrix<double,1,1>::Identity());
 	    e->setRobustKernel( new g2o::RobustKernelHuber() );
 		e->setId(i+1);
 

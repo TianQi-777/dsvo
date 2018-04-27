@@ -49,7 +49,6 @@ private:
 	std::vector<KeyFrame> keyframes1;
 	double last_time;
 	bool param_changed;
-	double init_time;
 	cv::Mat cam0_Q;	//comparison with stereo match
 
 	Reconstructor reconstructor;
@@ -72,10 +71,9 @@ private:
 
 	KeyFrame createKeyFrame(const Pose& cur_pose, double cur_time, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const FeaturePoints& feature_points);
 
-	void featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::Mat& cur_img, const cv::Mat& K, FeatureTrackingResult& feature_tracking_result);
+	void featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::Mat& cur_img, FeatureTrackingResult& feature_tracking_result);
 
-	double propagateState(State& cur_state, const cv::Mat& cur_img, double cur_time, const KeyFrame& lastKF, const std::vector<cv::Point2f>& cur_features, const CameraModel& cam);
-	// void propagateState(State& cur_state, double cur_time, const KeyFrame& lastKF, const std::vector<cv::Point2f>& cur_features, const CameraModel& cam);
+	void propagateState(State& cur_state, const cv::Mat& cur_img, double cur_time, Frame& last_frame, const CameraModel& cam);
 
 	bool reconstructAndOptimize(FeatureTrackingResult feature_result, const KeyFrame& lastKF, 
 								const CameraModel& cam0, const CameraModel& cam1,

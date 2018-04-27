@@ -5,19 +5,17 @@ clear
 dir = '~/.ros';
 gt_a = load(strcat(dir,'/truth.txt'));
 vo = load(strcat(dir,'/vo.txt'));
-vo(:,1) = vo(:,1) + 0.15;
-% gt_a = gt_a(15:200, :);
-% vo = vo(15:200, :);
+vo1 = load(strcat(dir,'/vo_1.txt'));
+% gt_a = gt_a(5:end, :);
+% vo = vo(5:end, :);
 
 % get overlap of gt with vo
 i = 1; % index of vo
-while(vo(i,1) < gt_a(1,1))
-    i = i+1;
-end
-vo = vo(i:end, :);
-i = 1;
 j = 1; % index of gt_a
 k = 1; % index of gt_a
+while(j<=size(gt_a,1) && vo(i,1) < gt_a(j,1))
+    i = i+1;
+end
 while i<=size(vo,1)
     while(j<=size(gt_a,1) && vo(i,1) > gt_a(j,1))
         j = j+1;
@@ -27,17 +25,14 @@ while i<=size(vo,1)
     else
         gt(k,1) = vo(i,1);
         inc = (gt_a(j,2:4) - gt_a(j-1,2:4))/(gt_a(j,1) - gt_a(j-1,1));
-        gt(k,2:4) = gt_a(j-1,2:4) + (vo(i,1) - gt_a(j-1,1))*inc;
+        gt(k,2:4) = gt_a(j-1,2:4) + (gt(k,1) - gt_a(j-1,1))*inc;
     end
     i = i+1;
     k = k+1;
 end
 
-% use range of idx
-idx = 1:size(gt,1);
-% idx = [size(gt,1):-1:size(gt,1)-200];
-gt = gt(idx, :);
-vo = vo(idx, :);
+vo = vo(1:size(gt,1), :);
+vo1 = vo1(1:size(gt,1), :);
 
 %% align two set of points
 sz = size(gt,1);
@@ -100,21 +95,17 @@ vovn = vecnorm(vo(:,5:7)')';
 diffn = gtvn - vovn;
 rmsen = sqrt(diffn' * diffn / size(diffn,1));
 medn = median(abs(diffn));
-sortn = sort(abs(diffn));
 pern = abs(diffn) ./ gtvn;
 pern = sum(pern) / length(pern);
 fprintf('RMSE offset of scale = %f\n', rmsen);
 fprintf('Median offset of scale = %f\n', medn);
 fprintf('Average offset percentage of scale = %f\n', pern);
 figure('Name','Velocity Scale')
-subplot(1,2,1);
 plot(gtt, gtvn, 'g-');
 hold on
 plot(vot, vovn, 'r-');
 legend('Truth', 'Estimated');
 title('Velocity Scale');
-subplot(1,2,2);
-plot(sortn);
 
 % velocity orientation
 gtvd = gt(:,5:7) ./ gtvn;

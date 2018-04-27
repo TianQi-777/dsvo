@@ -25,6 +25,10 @@ void TransComparer::gt_Callback(const geometry_msgs::TransformStamped::ConstPtr&
 }
 
 void TransComparer::write_vo(const Pose& pose, double p_time) {
+	if(init_time < 0) {
+		init_time = p_time;
+	}
+	
 	vo_ofs << p_time - init_time << " " 
 		   << pose.position(0) << " " 
 		   << pose.position(1) << " " 

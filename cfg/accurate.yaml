@@ -3,16 +3,17 @@ dictitems:
   BA_MAX_STEP: 10
   BLUR_SZ: 3
   BLUR_VAR: 1.0
-  INIT_MAX_KP: 100
-  KP_BLOCKS: 3
+  INIT_MAX_KP: 50
+  KP_BLOCKS: 5
   LOOP_CLOSURE: false
-  MAX_REPROJ_DIST: 3
-  MIN_FEATURE_DIST: 10
+  MAX_REPROJ_DIST: 1
+  MIN_FEATURE_DIST: 5
   MONO_INLIER_THRES: 0.7
-  PROP_POSE_PYMD: 3
+  PROP_POSE_ITER: 50
+  PROP_POSE_PYMD: 1
   QUAL_LEVEL: 0.1
-  SCALE_MAX_STEP: 100
-  SCALE_PYMD: 3
+  SCALE_MAX_STEP: 50
+  SCALE_PYMD: 1
   TIME_DEBUG: false
   TIME_LOG: false
   groups: !!python/object/new:dynamic_reconfigure.encoding.Config
@@ -20,16 +21,17 @@ dictitems:
       BA_MAX_STEP: 10
       BLUR_SZ: 3
       BLUR_VAR: 1.0
-      INIT_MAX_KP: 100
-      KP_BLOCKS: 3
+      INIT_MAX_KP: 50
+      KP_BLOCKS: 5
       LOOP_CLOSURE: false
-      MAX_REPROJ_DIST: 3
-      MIN_FEATURE_DIST: 10
+      MAX_REPROJ_DIST: 1
+      MIN_FEATURE_DIST: 5
       MONO_INLIER_THRES: 0.7
-      PROP_POSE_PYMD: 3
+      PROP_POSE_ITER: 50
+      PROP_POSE_PYMD: 1
       QUAL_LEVEL: 0.1
-      SCALE_MAX_STEP: 100
-      SCALE_PYMD: 3
+      SCALE_MAX_STEP: 50
+      SCALE_PYMD: 1
       TIME_DEBUG: false
       TIME_LOG: false
       groups: !!python/object/new:dynamic_reconfigure.encoding.Config

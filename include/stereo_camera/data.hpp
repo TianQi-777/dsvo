@@ -12,7 +12,7 @@
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/plot.hpp>
 
-#define BATCH_SIZE 5
+#define BATCH_SIZE 3
 
 typedef Eigen::Matrix<double, 1, BATCH_SIZE*BATCH_SIZE> ScaleBatch;
 
@@ -41,6 +41,7 @@ struct FeaturePoints
 {
 	std::vector<cv::Point2f> features;
 	std::vector<cv::Point3f> points;
+	std::vector<double> uncertainties;
 };
 
 struct CameraModel {
@@ -67,7 +68,7 @@ struct KeyFrame {
 struct Frame {
 	cv::Mat img;
     std::vector<cv::Point2f> features;
-    std::vector<cv::Point2f> feature_pnp;
+    FeaturePoints feature_points;
 };
 
 struct  FeatureTrackingResult
@@ -75,7 +76,6 @@ struct  FeatureTrackingResult
 	double track_inliers;
     std::vector<cv::Point2f> lastKF_features;
     std::vector<cv::Point2f> cur_features;
-    std::vector<cv::Point2f> cur_feature_pnp;
 	cv::Mat inlier_mask;
 	cv::Mat R_lastKF2Cur;
 	cv::Mat t_lastKF2Cur;

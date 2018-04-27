@@ -108,7 +108,7 @@ double LocalKFOptimizer::getTransformBetweenKF(const KeyFrame& KF_from, const Ke
 
 	// t_from2to(0) += 0.1;
 	// projAndDrawPts(KF_from.feature_points.points, KF_to.img0, cam0.K, R_from2to, t_from2to, "local loop before");
-	double dist = pose_estimater.poseEstimate(KF_from.feature_points, KF_from.img0, cam0.K, KF_to.img0, 4, R_from2to, t_from2to);
+	double dist = pose_estimater.poseEstimate(KF_from.feature_points, KF_from.img0, cam0.K, KF_to.img0, 4, 20, R_from2to, t_from2to);
 	// projAndDrawPts(KF_from.feature_points.points, KF_to.img0, cam0.K, R_from2to, t_from2to, "local loop after");
 
 	Eigen::Matrix3d R = cam0.R_C2B * R_from2to * cam0.R_B2C;

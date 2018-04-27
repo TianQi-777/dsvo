@@ -36,6 +36,7 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
 
     std::vector<Eigen::Vector3d> pts_svd_in;
     std::vector<cv::Point2f> features0_in, features1_in;
+    std::vector<double> reproj0_errs, reproj1_errs;
     std::vector<cv::Point2d> proj_pts0, proj_pts1;
     cv::Mat rVec;
     cv::Rodrigues(R, rVec);
@@ -48,14 +49,18 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
         double v1 = proj_pts1[i].y;
 
         // reject outlier by reprojection
-        if( cv::norm(features0[i]-cv::Point2f(u0,v0)) < max_reproj_dist || 
-            cv::norm(features1[i]-cv::Point2f(u1,v1)) < max_reproj_dist )  {
+        double reproj0_err = cv::norm(features0[i]-cv::Point2f(u0,v0));
+        double reproj1_err = cv::norm(features1[i]-cv::Point2f(u1,v1));
+        if( reproj0_err < max_reproj_dist &&
+            reproj1_err < max_reproj_dist )  {
 
             Eigen::Vector3d p;
             p << pts_svd[i].x, pts_svd[i].y, pts_svd[i].z;
             pts_svd_in.push_back(p);
             features0_in.push_back(features0[i]);
             features1_in.push_back(features1[i]);
+            reproj0_errs.push_back(reproj0_err);
+            reproj1_errs.push_back(reproj1_err);
         }
 
     }
@@ -97,6 +102,7 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
     // add camera1 pose
     g2o::VertexSE3Expmap* v1 = new g2o::VertexSE3Expmap();
     v1->setId(1);
+    // v1->setFixed( true ); 
     v1->setEstimate( g2o::SE3Quat(R_eigen, t_eigen) );		// initialize with feature tracking result
     optimizer.addVertex( v1 );
 
@@ -104,11 +110,19 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
     std::vector<g2o::EdgeProjectXYZ2UV*> edge0s, edge1s;
     for ( size_t i=0; i<pts_svd_in.size(); i++ )
     {
+        // add triangulated point
         g2o::VertexSBAPointXYZ* v = new g2o::VertexSBAPointXYZ();
         v->setId( 2 + i );
         v->setMarginalized(true);
         v->setEstimate(pts_svd_in[i]);
         optimizer.addVertex( v );
+
+        // point uncertainty
+        Eigen::Vector3d r0 = pts_svd_in[i];
+        Eigen::Vector3d r1 = pts_svd_in[i] - t_eigen;
+        r0 = r0 / r0.norm();
+        r1 = r1 / r1.norm();
+        double angle = r0.transpose() * r1;
 
         // project to feature0
         g2o::EdgeProjectXYZ2UV*  edge0 = new g2o::EdgeProjectXYZ2UV();
@@ -116,6 +130,7 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
         edge0->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (v0) );
         edge0->setMeasurement( Eigen::Vector2d(features0_in[i].x, features0_in[i].y ) );
         edge0->setInformation( Eigen::Matrix2d::Identity() );
+        // edge0->setInformation( 1.0/reproj0_errs[i]*Eigen::Matrix2d::Identity() );
         edge0->setParameterId(0, 0);
         edge0->setRobustKernel( new g2o::RobustKernelHuber() );
         optimizer.addEdge( edge0 );
@@ -127,6 +142,7 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
         edge1->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (v1) );
         edge1->setMeasurement( Eigen::Vector2d(features1_in[i].x, features1_in[i].y ) );
         edge1->setInformation( Eigen::Matrix2d::Identity() );
+        // edge1->setInformation( 1.0/reproj1_errs[i]*Eigen::Matrix2d::Identity() );
         edge1->setParameterId(0,0);
         edge1->setRobustKernel( new g2o::RobustKernelHuber() );
         optimizer.addEdge( edge1 );
@@ -135,8 +151,11 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
     
     // optimizer.setVerbose(true);
     optimizer.initializeOptimization();
+    // optimizer.save("ba_before.g2o");
     optimizer.optimize(max_opt_step);
-    
+    // optimizer.save("ba_after.g2o");
+    // cv::waitKey();
+
     // if(optimizer.activeChi2() < 100) {
     g2o::VertexSE3Expmap* v = dynamic_cast<g2o::VertexSE3Expmap*>( optimizer.vertex(1) );
     Eigen::Isometry3d pose = v->estimate();
@@ -170,7 +189,7 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
         _pts.push_back(cv::Point3d(pos(0),pos(1),pos(2)));
         dists.push_back(dist);
     }
-	    // std::cout<<"BA ratio "<<float(_pts.size())/features0.size()<<std::endl;
+	    // std::cout<<"BA ratio "<<float(_pts.size())/features0_in.size()<<std::endl;
 
 	// remove outlier by reproject to left img
 	features0.clear();
@@ -190,10 +209,11 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
         double v1 = proj_pts1[i].y;
 
 		// reject outlier by reprojection
-		if( !(0<=u0 && u0<reproj_img.cols && 0<=v0 && v0<reproj_img.rows) || 
-			cv::norm(_features0[i]-cv::Point2f(u0,v0)) > max_reproj_dist || 
-		    !(0<=u0 && u0<reproj_img.cols && 0<=v0 && v0<reproj_img.rows) || 
-			cv::norm(_features1[i]-cv::Point2f(u1,v1)) > max_reproj_dist) 
+		if( !(0<=u0 && u0<reproj_img.cols && 0<=v0 && v0<reproj_img.rows) 
+          // || cv::norm(_features0[i]-cv::Point2f(u0,v0)) > max_reproj_dist 
+          || !(0<=u0 && u0<reproj_img.cols && 0<=v0 && v0<reproj_img.rows) 
+          // || cv::norm(_features1[i]-cv::Point2f(u1,v1)) > max_reproj_dist
+            ) 
 			continue;
 
         cv::drawMarker(reproj_img, cv::Point2d(u0, v0), cv::Scalar(0,0,255), cv::MARKER_CROSS, marker_size);
