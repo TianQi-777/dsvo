@@ -1,0 +1,9 @@
+Change to fast detector
+
+Scale refine
+
+BA with large step
+
+pure rotation
+
+Two camera fusing

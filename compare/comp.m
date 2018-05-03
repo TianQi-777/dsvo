@@ -5,7 +5,7 @@ clear
 dir = '~/.ros';
 gt_a = load(strcat(dir,'/truth.txt'));
 vo = load(strcat(dir,'/vo.txt'));
-vo(:,1) = vo(:,1) + 0.15;
+% vo(:,1) = vo(:,1) + 0.15;
 % gt_a = gt_a(15:200, :);
 % vo = vo(15:200, :);
 
@@ -111,10 +111,13 @@ subplot(1,2,1);
 plot(gtt, gtvn, 'g-');
 hold on
 plot(vot, vovn, 'r-');
+ylim([0 min(5,max(vovn)+0.1)]);
 legend('Truth', 'Estimated');
 title('Velocity Scale');
 subplot(1,2,2);
 plot(sortn);
+perct = sortn(floor(0.95*length(sortn)));
+ylim([0 perct]);
 
 % velocity orientation
 gtvd = gt(:,5:7) ./ gtvn;

@@ -1,9 +1,12 @@
 #include "stereo_camera/stereo_camera.hpp"
 #include <cmath>
 
+int MIN_TRACK_POINTS = 20;
+double MIN_TRACK_RATIO = 0.5;
+
 // parameters
 int MAX_REPROJ_DIST, KP_BLOCKS, INIT_MAX_KP, BA_MAX_STEP, SCALE_MAX_STEP, SCALE_PYMD, MIN_FEATURE_DIST, PROP_POSE_PYMD, PROP_POSE_ITER, BLUR_SZ;
-double MONO_INLIER_THRES, QUAL_LEVEL, BLUR_VAR;
+double MONO_INLIER_THRES, QUAL_LEVEL, BLUR_VAR, MONO_MIN_DISP, MAX_E_DIST;
 bool LOOP_CLOSURE, TIME_DEBUG, TIME_LOG;
 
 void StereoCamera::updateConfig(direct_stereo::DirectStereoConfig &config, uint32_t level) {
@@ -24,6 +27,8 @@ void StereoCamera::updateConfig(direct_stereo::DirectStereoConfig &config, uint3
 	LOOP_CLOSURE = config.LOOP_CLOSURE;
 	TIME_DEBUG = config.TIME_DEBUG;
 	TIME_LOG = config.TIME_LOG;
+	MONO_MIN_DISP = config.MONO_MIN_DISP;
+	MAX_E_DIST = config.MAX_E_DIST;
 	if(TIME_LOG) {
 		if(time_ofs.is_open()) {
 			time_ofs.close();
@@ -255,7 +260,8 @@ void StereoCamera::monoTrack(State& cur_state, ros::Time cur_time_ros, const cv:
 	}
 
 	//initialize key_frame
-    if(keyframes.empty() || keyframes.back().features0.size() < 50 ) {
+    if (keyframes.empty() || keyframes.back().features0.size() < 50 
+   	|| (keyframes.back().feature_points.points.size()>0 && last_frame.feature_points.points.size() < MIN_TRACK_POINTS)) {
     	if(!keyframes.empty()) frame_dropped_count++;
 		
 		// std::cout<<"KeyFrame("<<keyframes.size()<<") | Dropped("<<frame_dropped_count<<")frames"<<std::endl;
@@ -272,11 +278,10 @@ void StereoCamera::monoTrack(State& cur_state, ros::Time cur_time_ros, const cv:
     	return;
     }
 
-	// std::cout<<keyframes.back().features0.size()<<std::endl;	//TODO
+	std::cout<<keyframes.back().features0.size()<<std::endl;	//TODO
     KeyFrame& lastKF = keyframes.back();
 
-	// std::clock_t start;
-	// start = std::clock();
+	// std::clock_t start = std::clock();
 	//feature tracking
 	FeatureTrackingResult feature_tracking_result;
 	featureTrack(lastKF, last_frame, cur_img0, feature_tracking_result);
@@ -291,14 +296,14 @@ void StereoCamera::monoTrack(State& cur_state, ros::Time cur_time_ros, const cv:
 	last_frame.img = cur_img0.clone();
 
 	Eigen::Vector3d disp = cur_state.pose.position - lastKF.pose.position;
-	if (last_frame.feature_points.points.size() < 50 || last_frame.feature_points.points.size() < lastKF.feature_points.points.size() * 0.5 || disp.norm() > 0.5)
+	if (last_frame.feature_points.points.size() < 2*MIN_TRACK_POINTS || last_frame.feature_points.points.size() < lastKF.feature_points.points.size() * MIN_TRACK_RATIO || disp.norm() > MONO_MIN_DISP)
 	{
 	    //recover pose
 	    cv::Mat Est, inlier_mask, R, t;
 
 		std::clock_t start;
 		start = std::clock();
-	    Est  = cv::findEssentialMat(lastKF.features0, feature_tracking_result.cur_features, cam0.K, cv::RANSAC, 0.99, 1.0, inlier_mask);
+	    Est  = cv::findEssentialMat(lastKF.features0, feature_tracking_result.cur_features, cam0.K, cv::RANSAC, 0.99, MAX_E_DIST, inlier_mask);
 	    int inlier_count = cv::recoverPose(Est, lastKF.features0, feature_tracking_result.cur_features, cam0.K, R, t, inlier_mask);
 		if(TIME_DEBUG) {
 			std::cout << "Essential & Pose: " << (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " ms" << std::endl;
@@ -426,7 +431,7 @@ void StereoCamera::featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::M
 
 void StereoCamera::propagateState(State& cur_state, const cv::Mat& cur_img, double cur_time, Frame& last_frame, const CameraModel& cam) {
 	bool brutePropagate = true;
-	if(last_frame.feature_points.points.size() > 10) {
+	if(last_frame.feature_points.points.size() > MIN_TRACK_POINTS) {
 		Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
 		Eigen::Vector3d t = Eigen::Vector3d::Zero();
 
