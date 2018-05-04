@@ -2,38 +2,50 @@
 dictitems:
   BA_MAX_STEP: 10
   BLUR_SZ: 3
-  BLUR_VAR: 1.0
-  INIT_MAX_KP: 20
-  KP_BLOCKS: 3
+  BLUR_VAR: 0.5
+  DEBUG_FEATURE: false
+  FAST_THRES: 5
+  FEATURE_OF_PYMD: 0
+  INIT_SCALE: 0.1
+  KP_BLOCKS: 10
   LOOP_CLOSURE: false
+  MAX_E_DIST: 2.0
+  MAX_FEATURES: 200
   MAX_REPROJ_DIST: 3
-  MIN_FEATURE_DIST: 10
+  MIN_TRACK_RATIO: 0.5
   MONO_INLIER_THRES: 0.7
-  PROP_POSE_ITER: 20
+  MONO_MIN_DIST: 0.5
+  PROP_POSE_ITER: 30
   PROP_POSE_PYMD: 1
-  QUAL_LEVEL: 0.1
-  SCALE_MAX_STEP: 50
-  SCALE_PYMD: 2
+  REFINE_PIXEL: false
+  SCALE_MAX_STEP: 20
+  SCALE_PYMD: 3
   TIME_DEBUG: false
-  TIME_LOG: false
+  TIME_LOG: true
   groups: !!python/object/new:dynamic_reconfigure.encoding.Config
     dictitems:
       BA_MAX_STEP: 10
       BLUR_SZ: 3
-      BLUR_VAR: 1.0
-      INIT_MAX_KP: 20
-      KP_BLOCKS: 3
+      BLUR_VAR: 0.5
+      DEBUG_FEATURE: false
+      FAST_THRES: 5
+      FEATURE_OF_PYMD: 0
+      INIT_SCALE: 0.1
+      KP_BLOCKS: 10
       LOOP_CLOSURE: false
+      MAX_E_DIST: 2.0
+      MAX_FEATURES: 200
       MAX_REPROJ_DIST: 3
-      MIN_FEATURE_DIST: 10
+      MIN_TRACK_RATIO: 0.5
       MONO_INLIER_THRES: 0.7
-      PROP_POSE_ITER: 20
+      MONO_MIN_DIST: 0.5
+      PROP_POSE_ITER: 30
       PROP_POSE_PYMD: 1
-      QUAL_LEVEL: 0.1
-      SCALE_MAX_STEP: 50
-      SCALE_PYMD: 2
+      REFINE_PIXEL: false
+      SCALE_MAX_STEP: 20
+      SCALE_PYMD: 3
       TIME_DEBUG: false
-      TIME_LOG: false
+      TIME_LOG: true
       groups: !!python/object/new:dynamic_reconfigure.encoding.Config
         state: []
       id: 0

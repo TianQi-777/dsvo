@@ -1,9 +1,22 @@
-Change to fast detector
-
 Scale refine
 
 BA with large step
 
 pure rotation
 
+rotation brute force prop
+
 Two camera fusing
+
+rosparam set use_sim_time true
+rosbag play --clock sptam.bag -s 90 -u 30
+roslaunch sptam euroc.launch
+
+
+Kitti:
+consecutive keyframe bad scale=0
+wrong scale with many opt steps
+
+if propagation has few points, use feature tracking results to get better tracking result
+
+cv::remap slow

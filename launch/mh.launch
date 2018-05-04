@@ -8,6 +8,7 @@
 	    <param name="cam1_topic" value="/cam1/image_raw" />
 	    <param name="pos_topic" value="/leica/position" />
 	    <param name="gt_type" value="point" />
+	    <param name="cvt2VGA" value="false" />
     </node>
 
 </launch>

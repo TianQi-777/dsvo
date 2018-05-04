@@ -5,38 +5,42 @@ Manager::Manager() {
 	std::vector<double> T_BS0, K0, frame_size0, dist_coeff0;
 	std::vector<double> T_BS1, K1, frame_size1, dist_coeff1;
 	// cameras model
-	if(!nhPriv.getParam("/cam0/T_BS/data", T_BS0) 
-	|| !nhPriv.getParam("/cam0/intrinsics", K0) 
-	|| !nhPriv.getParam("/cam0/resolution", frame_size0) 
+	if(!nhPriv.getParam("/cam0/T_BS/data", T_BS0)
+	|| !nhPriv.getParam("/cam0/intrinsics", K0)
+	|| !nhPriv.getParam("/cam0/resolution", frame_size0)
 	|| !nhPriv.getParam("/cam0/distortion_coefficients", dist_coeff0)
-	|| !nhPriv.getParam("/cam1/T_BS/data", T_BS1) 
-	|| !nhPriv.getParam("/cam1/intrinsics", K1) 
-	|| !nhPriv.getParam("/cam1/resolution", frame_size1) 
-	|| !nhPriv.getParam("/cam1/distortion_coefficients", dist_coeff1) 
+	|| !nhPriv.getParam("/cam1/T_BS/data", T_BS1)
+	|| !nhPriv.getParam("/cam1/intrinsics", K1)
+	|| !nhPriv.getParam("/cam1/resolution", frame_size1)
+	|| !nhPriv.getParam("/cam1/distortion_coefficients", dist_coeff1)
     )
 	{
 		ROS_INFO("Fail to get cameras parameters, exit.");
         return;
 	}
 
+	bool cvt2VGA = false;
+	nhPriv.getParam("cvt2VGA", cvt2VGA);
+	std::cout<<"cvt2VGA "<<cvt2VGA<<std::endl;
+
 	// ground truth type
 	string gt_type = "";
 	nhPriv.getParam("gt_type", gt_type);
 	stereo_cam = boost::shared_ptr<StereoCamera>(new StereoCamera(T_BS0, K0, frame_size0, dist_coeff0,
 																  T_BS1, K1, frame_size1, dist_coeff1,
-																  gt_type));
+																  cvt2VGA, gt_type));
 
 	// sensor topics
 	std::string cam0_topic, cam1_topic;
-	if(!nhPriv.getParam("cam0_topic", cam0_topic) 
+	if(!nhPriv.getParam("cam0_topic", cam0_topic)
 	|| !nhPriv.getParam("cam1_topic", cam1_topic) )
 	{
 		ROS_INFO("Fail to get sensor topics, exit.");
         return;
 	}
 
-	cam0_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, cam0_topic, 200);
-	cam1_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, cam1_topic, 200);
+	cam0_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, cam0_topic, 1000);
+	cam1_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, cam1_topic, 1000);
 
 	sync = new message_filters::Synchronizer<StereoSyncPolicy>(StereoSyncPolicy(10), *cam0_sub, *cam1_sub);
 	sync->registerCallback(boost::bind(&Manager::imageMessageCallback, this, _1, _2));
@@ -63,7 +67,7 @@ void Manager::imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, 
 	cv::cvtColor(cur_img0, cur_img0, CV_BGR2GRAY);
 	cv::cvtColor(cur_img1, cur_img1, CV_BGR2GRAY);
 
-	stereo_cam->track(state, cur_img0, cur_img1, img0_cptr->header.stamp);
+	stereo_cam->track(state, cur_img0, cur_img1, img0_cptr->header.stamp.toSec());
 
 	return;
 }

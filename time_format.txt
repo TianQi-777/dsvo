@@ -1,0 +1,10 @@
+-1 stereo rectify
+0  frame
+1  normal frame
+2  DSVO frame
+3  stereo frame
+11 feature tracking
+121 pose propagation, direct
+122 pose propagation, refine by OF
+131 reconstruct points
+132 scale optimization

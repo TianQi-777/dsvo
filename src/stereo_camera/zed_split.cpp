@@ -12,9 +12,9 @@ int main(int argc, char** argv)
     if(!cap.isOpened()) 
         return -1;
 
-    cap.set(cv::CAP_PROP_FRAME_WIDTH, 2560);
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
-    cap.set(cv::CAP_PROP_FPS, 60);
+    cap.set(cv::CAP_PROP_FRAME_WIDTH, 1344);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 376);
+    cap.set(cv::CAP_PROP_FPS, 100);
 
     ros::init(argc, argv, "zed_split");
     ros::NodeHandle nh;
@@ -24,7 +24,7 @@ int main(int argc, char** argv)
 
     // namedWindow("frame",1);
     int counter=0;
-    ros::Rate loop_rate(100);
+    ros::Rate loop_rate(20);
     while (nh.ok())
     {
         Mat frame;

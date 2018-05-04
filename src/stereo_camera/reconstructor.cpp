@@ -1,9 +1,10 @@
 #include "stereo_camera/reconstructor.hpp"
 
-void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& features0, std::vector<cv::Point2f>& features1, 
+void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& features0, std::vector<cv::Point2f>& features1,
 									const cv::Mat& K, cv::Mat& R, cv::Mat& t, int max_opt_step, int max_reproj_dist,
 									std::vector<PointWithUncertainty>& pts, cv::Mat& reproj_img) {
 
+	assert(features0.size() > 1 && features0.size()==features1.size());
 	std::vector<cv::Point3d> pts_svd;
 	// get perspective projection matrix
     cv::Mat Pl, Pr;
@@ -29,7 +30,7 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
         double x = V.at<double>(0,3) / V.at<double>(3,3);
         double y = V.at<double>(1,3) / V.at<double>(3,3);
         double z = V.at<double>(2,3) / V.at<double>(3,3);
-  
+
 	    // cv::waitKey(0);
         pts_svd.push_back(cv::Point3d(x,y,z));
     }
@@ -65,6 +66,8 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
 
     }
 
+		if(features0_in.size() < 20) return;
+
 	double fx = K.at<double>(0,0);
 	double fy = K.at<double>(1,1);
 	double cx = K.at<double>(0,2);
@@ -84,25 +87,25 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
 
     optimizer.setAlgorithm( algorithm );
     optimizer.setVerbose( false );
-    
+
     // add camera parameters
     g2o::CameraParameters* cam = new g2o::CameraParameters( fx, Eigen::Vector2d(cx, cy), 0 );
     cam->setId(0);
 	if (!optimizer.addParameter(cam)) {
 		assert(false);
 	}
-    
+
     // add camera0 pose
     g2o::VertexSE3Expmap* v0 = new g2o::VertexSE3Expmap();
     v0->setId(0);
-    v0->setFixed( true ); 
+    v0->setFixed( true );
     v0->setEstimate( g2o::SE3Quat() );
     optimizer.addVertex( v0 );
 
     // add camera1 pose
     g2o::VertexSE3Expmap* v1 = new g2o::VertexSE3Expmap();
     v1->setId(1);
-    // v1->setFixed( true ); 
+    // v1->setFixed( true );
     v1->setEstimate( g2o::SE3Quat(R_eigen, t_eigen) );		// initialize with feature tracking result
     optimizer.addVertex( v1 );
 
@@ -148,7 +151,7 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
         optimizer.addEdge( edge1 );
         edge1s.push_back(edge1);
     }
-    
+
     // optimizer.setVerbose(true);
     optimizer.initializeOptimization();
     // optimizer.save("ba_before.g2o");
@@ -196,32 +199,71 @@ void Reconstructor::reconstructAndBundleAdjust(std::vector<cv::Point2f>& feature
 	features1.clear();
 	pts.clear();
 	proj_pts0.clear();
-    proj_pts1.clear();
-    cv::cvtColor(reproj_img, reproj_img, cv::COLOR_GRAY2BGR);
-    cv::Rodrigues(R, rVec);
-    cv::projectPoints(_pts, cv::Mat::zeros(3,1,CV_64F), cv::Mat::zeros(3,1,CV_64F), K, cv::Mat::zeros(1,4,CV_64F), proj_pts0);
-    cv::projectPoints(_pts, rVec, t, K, cv::Mat::zeros(1,4,CV_64F), proj_pts1);
-    int marker_size = reproj_img.rows / 50;
+  proj_pts1.clear();
+  // cv::cvtColor(reproj_img, reproj_img, cv::COLOR_GRAY2BGR);
+  cv::Rodrigues(R, rVec);
+  cv::projectPoints(_pts, cv::Mat::zeros(3,1,CV_64F), cv::Mat::zeros(3,1,CV_64F), K, cv::Mat::zeros(1,4,CV_64F), proj_pts0);
+  cv::projectPoints(_pts, rVec, t, K, cv::Mat::zeros(1,4,CV_64F), proj_pts1);
+  int marker_size = reproj_img.rows / 50;
 	for(int i=0; i<_pts.size(); i++) {
-        double u0 = proj_pts0[i].x;
-        double v0 = proj_pts0[i].y;
-        double u1 = proj_pts1[i].x;
-        double v1 = proj_pts1[i].y;
+    double u0 = proj_pts0[i].x;
+    double v0 = proj_pts0[i].y;
+    double u1 = proj_pts1[i].x;
+    double v1 = proj_pts1[i].y;
 
 		// reject outlier by reprojection
-		if( !(0<=u0 && u0<reproj_img.cols && 0<=v0 && v0<reproj_img.rows) 
-          // || cv::norm(_features0[i]-cv::Point2f(u0,v0)) > max_reproj_dist 
-          || !(0<=u0 && u0<reproj_img.cols && 0<=v0 && v0<reproj_img.rows) 
-          // || cv::norm(_features1[i]-cv::Point2f(u1,v1)) > max_reproj_dist
-            ) 
-			continue;
+		if( !(0<=u0 && u0<reproj_img.cols && 0<=v0 && v0<reproj_img.rows)
+        // || cv::norm(_features0[i]-cv::Point2f(u0,v0)) > max_reproj_dist
+        || !(0<=u0 && u0<reproj_img.cols && 0<=v0 && v0<reproj_img.rows)
+        // || cv::norm(_features1[i]-cv::Point2f(u1,v1)) > max_reproj_dist
+          )
+		continue;
 
-        cv::drawMarker(reproj_img, cv::Point2d(u0, v0), cv::Scalar(0,0,255), cv::MARKER_CROSS, marker_size);
-
+    cv::drawMarker(reproj_img, cv::Point2d(u0, v0), cv::Scalar(0,0,255), cv::MARKER_CROSS, marker_size);
 		cv::circle(reproj_img, _features0[i], marker_size*1.2, cv::Scalar(0,255,0));
 
 		features0.push_back(_features0[i]);
 		features1.push_back(_features1[i]);
 		pts.push_back(PointWithUncertainty(_pts[i], dists[i]));
 	}
+}
+
+void Reconstructor::refinePixel(const cv::Mat& src_img, const cv::Mat& dest_img, const std::vector<cv::Point2f>& src_fts, std::vector<cv::Point2f>& dest_fts) {
+    g2o::SparseOptimizer optimizer;
+    std::unique_ptr<PixelBlockSolver::LinearSolverType> linearSolver;
+    linearSolver = g2o::make_unique<PixelLinearSolver>();
+    g2o::OptimizationAlgorithmLevenberg* algorithm = new g2o::OptimizationAlgorithmLevenberg(
+        g2o::make_unique<PixelBlockSolver>(std::move(linearSolver)));
+
+    optimizer.setAlgorithm(algorithm);
+    optimizer.setVerbose(false);
+
+    for(int i=0; i<src_fts.size(); i++) {
+        optimizer.clear();
+
+        VertexPixel* v = new VertexPixel();
+        v->setEstimate(dest_fts[i].x);
+        v->setId(0);
+        optimizer.addVertex(v);
+
+        PixelEdge* e = new PixelEdge(src_fts[i].y, dest_img);
+        e->setVertex(0, v);
+        ScaleBatch batch;
+        getBatchAround(src_img, src_fts[i].x, src_fts[i].y, batch);
+        e->setMeasurement(batch);
+        // e->setInformation(1.0/uncertaintys[i]*Eigen::Matrix<double,1,1>::Identity());
+        e->setInformation(Eigen::Matrix<double,1,1>::Identity());
+        // e->setRobustKernel( new g2o::RobustKernelHuber() );
+        e->setId(1);
+
+        optimizer.addEdge(e);
+        optimizer.initializeOptimization();
+        optimizer.optimize(10);
+
+        if( fabs(dest_fts[i].x - v->estimate()) < 1.0) {
+        // std::cout<<dest_fts[i].x << "=" << v->estimate()<<std::endl;
+            dest_fts[i].x = v->estimate();
+            dest_fts[i].y = src_fts[i].y;
+        }
+    }
 }

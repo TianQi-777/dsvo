@@ -12,7 +12,7 @@
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/plot.hpp>
 
-#define BATCH_SIZE 3
+#define BATCH_SIZE 5
 
 typedef Eigen::Matrix<double, 1, BATCH_SIZE*BATCH_SIZE> ScaleBatch;
 
@@ -66,6 +66,8 @@ struct KeyFrame {
 };
 
 struct Frame {
+	Pose pose;
+	double time;
 	cv::Mat img;
     std::vector<cv::Point2f> features;
     FeaturePoints feature_points;
@@ -73,16 +75,17 @@ struct Frame {
 
 struct  FeatureTrackingResult
 {
-	double track_inliers;
-    std::vector<cv::Point2f> lastKF_features;
-    std::vector<cv::Point2f> cur_features;
-	cv::Mat inlier_mask;
+  std::vector<cv::Point2f> lastKF_features;
+  std::vector<cv::Point2f> cur_features;
 	cv::Mat R_lastKF2Cur;
 	cv::Mat t_lastKF2Cur;
 
-	FeatureTrackingResult() {
-	   R_lastKF2Cur = cv::Mat::eye(3,3,CV_64F);
-	   t_lastKF2Cur = cv::Mat::zeros(3,1,CV_64F);
+	FeatureTrackingResult(const std::vector<cv::Point2f>& _lastKF_features, const std::vector<cv::Point2f>& _cur_features, const cv::Mat& _R_lastKF2Cur, const cv::Mat& _t_lastKF2Cur) {
+		assert(_last_features.size() == _cur_features.size());
+  	lastKF_features=_lastKF_features;
+  	cur_features=_cur_features;
+		R_lastKF2Cur = _R_lastKF2Cur;
+		t_lastKF2Cur = _t_lastKF2Cur;
 	}
 };
 

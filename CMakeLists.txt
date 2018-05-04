@@ -29,13 +29,14 @@ catkin_package()
 
 include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS} include)
 
-add_executable(manager_node src/manager_node.cpp src/manager.cpp src/state.cpp src/comparers/comparer.cpp src/comparers/odom_comparer.cpp src/comparers/point_comparer.cpp src/comparers/trans_comparer.cpp src/stereo_camera/stereo_camera.cpp src/stereo_camera/reconstructor.cpp src/stereo_camera/scale_edge.cpp src/stereo_camera/scale_optimizer.cpp src/stereo_camera/local_KF_optimizer.cpp src/stereo_camera/pose_edge.cpp src/stereo_camera/pose_estimater.cpp src/stereo_camera/edge_se3m.cpp)
+add_executable(manager_node src/manager_node.cpp src/manager.cpp src/state.cpp src/comparers/comparer.cpp src/comparers/odom_comparer.cpp src/comparers/point_comparer.cpp src/comparers/trans_comparer.cpp src/stereo_camera/stereo_camera.cpp src/stereo_camera/stereo_camera_helpers.cpp src/stereo_camera/reconstructor.cpp src/stereo_camera/scale_edge.cpp src/stereo_camera/scale_optimizer.cpp src/stereo_camera/local_KF_optimizer.cpp src/stereo_camera/pose_edge.cpp src/stereo_camera/pose_estimater.cpp src/stereo_camera/edge_se3m.cpp src/stereo_camera/pixel_edge.cpp)
 
 add_executable(zed_split src/stereo_camera/zed_split.cpp)
+add_executable(kitti_pub src/stereo_camera/kitti_pub.cpp)
 
 add_dependencies(manager_node ${PROJECT_NAME}_gencfg)
 
-target_link_libraries(manager_node 
+target_link_libraries(manager_node
 	${catkin_LIBRARIES}
 	${OpenCV_LIBS}
   ${CSPARSE_LIBRARY}
@@ -44,7 +45,12 @@ target_link_libraries(manager_node
 )
 
 
-target_link_libraries(zed_split 
+target_link_libraries(zed_split
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+)
+
+target_link_libraries(kitti_pub
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
 )

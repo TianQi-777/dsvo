@@ -24,13 +24,14 @@ void TransComparer::gt_Callback(const geometry_msgs::TransformStamped::ConstPtr&
 	cur_time = msg->header.stamp.toSec();
 }
 
-void TransComparer::write_vo(const Pose& pose, double p_time) {
+void TransComparer::write_vo(const Pose& pose, double p_time, bool stereo_match_flag) {
 	if(init_time < 0) {
 		init_time = p_time;
 	}
-	
-	vo_ofs << p_time - init_time << " " 
-		   << pose.position(0) << " " 
-		   << pose.position(1) << " " 
+
+	vo_ofs << p_time - init_time << " "
+			 << stereo_match_flag << " "
+		   << pose.position(0) << " "
+		   << pose.position(1) << " "
 		   << pose.position(2) << std::endl;
 }

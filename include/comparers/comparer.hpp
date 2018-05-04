@@ -17,13 +17,13 @@ protected:
 
 	double init_time;
 	double cur_time;
-	
+
 public:
 	Comparer();
 	void reset();
 
-	virtual void write_vo(const Pose& pose, double p_time){};
+	virtual void write_vo(const Pose& pose, double p_time, bool stereo_match_flag){};
 };
 
 
-#endif 
+#endif

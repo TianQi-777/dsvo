@@ -34,7 +34,7 @@ double PoseEstimater::poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, 
 	}
 	
 	poseOptimizer.initializeOptimization();
-	poseOptimizer.optimize(50);
+	poseOptimizer.optimize(iter);
 
 	Eigen::Isometry3d T = pose->estimate();
 	R = T.rotation();
@@ -85,8 +85,16 @@ double PoseEstimater::poseEstimate(const FeaturePoints& fts_pts, const cv::Mat& 
 	double dist = 0.0;
 	for(int i=pymd-1; i>=0; i--)
 	{
+		// cv::Mat proj_img = dest_img.clone();
+		// project3DPtsToImg(fts_pts.points, K, R, t, proj_img);
+		// cv::imshow("Pose projection", proj_img);
+		// cv::waitKey();
 		dist = poseEstimatePymd(pts_eigen, fts_pymd[i], source_img_pymd[i], dest_img_pymd[i], K_pymd[i], R, t, iter);
 	}
+		// cv::Mat proj_img = dest_img.clone();
+		// project3DPtsToImg(fts_pts.points, K, R, t, proj_img);
+		// cv::imshow("Pose projection", proj_img);
+		// cv::waitKey();
 
 	assert(dist>0.0);
 	return dist;

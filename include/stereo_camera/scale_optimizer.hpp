@@ -17,11 +17,11 @@
 
 class ScaleOptimizer{
 public:
-	bool optimize(const std::vector<cv::Point2f>& fts, std::vector<PointWithUncertainty>& pts, double& scale, 
-				  const CameraModel& cam1, const cv::Mat& img0, const cv::Mat& img1, int pymd, int max_opt_step); 
-	
-	bool optimize_pymd(const std::vector<cv::Point2f>& fts, const std::vector<Eigen::Vector3d>& pts, std::vector<double>& uncertaintys, 
-					   double& scale, const cv::Mat& img0, const cv::Mat& img1, double tx, const Eigen::Matrix3d& K1, int max_opt_step); 
+	double optimize(const std::vector<cv::Point2f>& fts, std::vector<PointWithUncertainty>& pts, double& scale,
+				  const CameraModel& cam1, const cv::Mat& img0, const cv::Mat& img1, int pymd, int max_opt_step);
+
+	double optimize_pymd(const std::vector<cv::Point2f>& fts, const std::vector<Eigen::Vector3d>& pts, std::vector<double>& uncertaintys, 
+					   double& scale, const cv::Mat& img0, const cv::Mat& img1, double tx, const Eigen::Matrix3d& K1, int max_opt_step);
 
 
 };
