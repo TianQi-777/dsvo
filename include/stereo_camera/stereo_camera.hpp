@@ -48,16 +48,15 @@ class StereoCamera
 private:
 	// parameters
   int OF_size = 11;		// optical flow size
-	float MAX_VEL = 3;
+	float MAX_VEL = 10;
 	double MAX_SCALE = 10;
-	int MAX_REPROJ_DIST, KP_BLOCKS, INIT_MAX_KP, BA_MAX_STEP, SCALE_MAX_STEP, SCALE_PYMD, MIN_FEATURE_DIST, PROP_POSE_PYMD, PROP_POSE_ITER, BLUR_SZ, FAST_THRES, MAX_FEATURES, MIN_TRACK_POINTS;
+	int MAX_REPROJ_DIST, KP_BLOCKS, INIT_MAX_KP, BA_MAX_STEP, SCALE_MAX_STEP, SCALE_PYMD, MIN_FEATURE_DIST, PROP_POSE_PYMD, PROP_POSE_ITER, BLUR_SZ, FAST_THRES, MAX_FEATURES_PER_CELL, MIN_TRACK_POINTS;
 	int FEATURE_OF_PYMD;
 	double MONO_INLIER_THRES, QUAL_LEVEL, BLUR_VAR, MIN_TRACK_DIST, INIT_SCALE;
-	bool LOOP_CLOSURE, REFINE_PIXEL, DEBUG_FEATURE, TEST_STEREO;
+	bool LOOP_CLOSURE, REFINE_PIXEL, DEBUG, TEST_STEREO;
 
 	ros::NodeHandle nh;
-	ros::Publisher direct_pcl_pub;
-	ros::Publisher stereo_pcl_pub;
+	ros::Publisher pcl_pub;
 	ros::Publisher pose_pub;
 	dynamic_reconfigure::Server<direct_stereo::DirectStereoConfig> server;
 	dynamic_reconfigure::Server<direct_stereo::DirectStereoConfig>::CallbackType f;
@@ -84,6 +83,8 @@ private:
   double init_time=-1.0;
   double cur_time;
   bool stereo_match_flag;
+
+  PointCloud::Ptr point_cloud;
 	// shared_ptr<DirectSolver> directSolver_ptr;
 
 	void truth_Callback(const geometry_msgs::PointStamped::ConstPtr& msg);
@@ -95,7 +96,7 @@ private:
 
 	void detectFeatures(const cv::Mat& img, std::vector<cv::KeyPoint>& kps);
 
-	KeyFrame createKeyFrame(const Pose& cur_pose, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const FeaturePoints& feature_points, const CameraModel& cam0=CameraModel());
+	KeyFrame createKeyFrame(const Pose& cur_pose, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const FeaturePoints& feature_points, const CameraModel& cam0);
 
 	void featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::Mat& cur_img, std::vector<cv::Point2f>& cur_features);
 
@@ -117,6 +118,8 @@ public:
 			     bool cvt2VGA, const string& gt_type);
 
 	void updateConfig(direct_stereo::DirectStereoConfig &config, uint32_t level);
+
+  void stereo_rectify(cv::Mat& cur_img0, cv::Mat& cur_img1);
 
 	void track(State& cur_state, const cv::Mat& _cur_img0, const cv::Mat& _cur_img1, double _cur_time);
 };

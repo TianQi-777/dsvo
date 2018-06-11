@@ -19,7 +19,6 @@ double PoseEstimater::poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, 
 	pose->setEstimate(g2o::SE3Quat(R, t));
 	pose->setId(0);
 	poseOptimizer.addVertex(pose);
-
 	for(int i=0; i<fts.size(); i++) {
 		PoseEdge* edge = new PoseEdge(pts[i], K, dest_img);
 		edge->setVertex(0, pose);
@@ -27,12 +26,12 @@ double PoseEstimater::poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, 
 		getBatchAround(source_img,fts[i].x,fts[i].y,batch);
 		edge->setMeasurement(batch);
 		edge->setInformation(Eigen::Matrix<double,1,1>::Identity());
-        edge->setRobustKernel( new g2o::RobustKernelHuber() );
+    edge->setRobustKernel( new g2o::RobustKernelHuber() );
 		edge->setId(i+1);
 
 		poseOptimizer.addEdge(edge);
 	}
-	
+
 	poseOptimizer.initializeOptimization();
 	poseOptimizer.optimize(iter);
 
@@ -52,7 +51,7 @@ double PoseEstimater::poseEstimate(const FeaturePoints& fts_pts, const cv::Mat& 
 		pts_eigen.push_back(tmp);
 	}
 
-	// create pymd 
+	// create pymd
 	cv::Mat tmp0 = source_img.clone();
 	cv::Mat tmp1 = dest_img.clone();
 	std::vector<cv::Mat> source_img_pymd;
@@ -66,7 +65,7 @@ double PoseEstimater::poseEstimate(const FeaturePoints& fts_pts, const cv::Mat& 
 		dest_img_pymd.push_back(tmp1);
 		cv::pyrDown(tmp0, tmp0, cv::Size(tmp0.cols/2, tmp0.rows/2));
 		cv::pyrDown(tmp1, tmp1, cv::Size(tmp1.cols/2, tmp1.rows/2));
-		
+
 		cv::Mat K_tmp = K/pymd_scale;
 		K_tmp.at<double>(2,2) = 1.0;
 		Eigen::Matrix3d K_eigen;

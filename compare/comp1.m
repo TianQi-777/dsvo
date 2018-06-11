@@ -40,8 +40,8 @@ vo = vo(1:length(gt),:);
 cg = mean(gt(:,2:4));
 cv = mean(vo(:,3:5));
 H = zeros(3,3);
-for i=1:length(gt)
-    H = H + (gt(i,2:4)-cg)'*(vo(i,3:5)-cv);
+for i=1:length(gt)/10
+    H = H + (gt(i,2:4)-gt(1,2:4))'*(vo(i,3:5)-vo(1,3:5));
 end
 [U,S,V] = svd(H);
 R = U*V';
@@ -151,7 +151,6 @@ xlabel('Percentage'); ylabel('Velocity Error m/s');
 
 tt = load(strcat(dir,'/time.txt'));
 t_f = tt(tt(:,1)==0,2:3);  % whole frame
-t_stereo_rectify = tt(tt(:,1)==-1,2:3);  % stereo rectify
 t_stereo = tt(tt(:,1)==3,2:3);  % stereo match
 t_normal = tt(tt(:,1)==1,2:3);  % normal frame
 t_dsvo = tt(tt(:,1)==2,2:3);  % keyframe
@@ -165,12 +164,11 @@ fprintf('\nAve. time for [%d] stereo match = %f\n', size(t_stereo,1), mean(t_ste
 fprintf('Ave. time for [%d] normal frame = %f\n', size(t_normal,1), mean(t_normal(:,2)));
 fprintf('Ave. time for [%d] DSVO Keyframe = %f\n', size(t_dsvo,1), mean(t_dsvo(:,2)));
 fprintf('Ave. time for [%d] frame = %f\n', size(t_f,1), mean(t_f(:,2)));
-fprintf('\nAve. stereo rectify time = %f\n', mean(t_stereo_rectify(:,2)));
 fprintf('Ave. feature tracking time = %f\n', mean(t_feature(:,2)));
 fprintf('Ave. pose propagation(direct) time = %f\n', mean(t_prap_dir(:,2)));
 fprintf('Ave. pose propagation(refine by OF) time = %f\n', mean(t_prap_rfof(:,2)));
 fprintf('Ave. points reconstruction time = %f\n', mean(t_pts(:,2)));
-fprintf('Ave. optimization time = %f\n', mean(t_scale(:,2)));
+fprintf('Ave. scale optimization time = %f\n', mean(t_scale(:,2)));
 % figure('Name','VO running time')
 % plot(t_normal(:,1), t_normal(:,2), 'g*-');
 % hold on

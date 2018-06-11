@@ -19,9 +19,9 @@ void StereoCamera::updateConfig(direct_stereo::DirectStereoConfig &config, uint3
 	MIN_TRACK_DIST = config.MIN_TRACK_DIST;
 	MIN_TRACK_POINTS = config.MIN_TRACK_POINTS;
 	FAST_THRES = config.FAST_THRES;
-	MAX_FEATURES = config.MAX_FEATURES;
+	MAX_FEATURES_PER_CELL = config.MAX_FEATURES_PER_CELL;
 	REFINE_PIXEL = config.REFINE_PIXEL;
-	DEBUG_FEATURE = config.DEBUG_FEATURE;
+	DEBUG = config.DEBUG;
 	FEATURE_OF_PYMD = config.FEATURE_OF_PYMD;
 	INIT_SCALE = config.INIT_SCALE;
 	TEST_STEREO = config.TEST_STEREO;
@@ -131,8 +131,7 @@ StereoCamera::StereoCamera(const std::vector<double>& E0,
 	camera0.stereo = stereo1;
 
 	// std::cout<<stereo0.t<<std::endl;
-	direct_pcl_pub = nh.advertise<PointCloud> ("direct_points", 1);
-	stereo_pcl_pub = nh.advertise<PointCloud> ("stereo_points", 1);
+	pcl_pub = nh.advertise<PointCloud> ("points", 1);
     pose_pub = nh.advertise<geometry_msgs::PoseStamped>("cam_pose", 1000);
 
 	// comparer type
@@ -148,9 +147,17 @@ StereoCamera::StereoCamera(const std::vector<double>& E0,
 	f = boost::bind(&StereoCamera::updateConfig, this, _1, _2);
   	server.setCallback(f);
 
-    frame_dropped_count = 0;
-    // directSolver_ptr = shared_ptr<DirectSolver>(new DirectSolver());
-    param_changed = true;
+  frame_dropped_count = 0;
+  // directSolver_ptr = shared_ptr<DirectSolver>(new DirectSolver());
+  param_changed = true;
+
+	point_cloud = PointCloud::Ptr(new PointCloud);
+}
+
+void StereoCamera::stereo_rectify(cv::Mat& cur_img0, cv::Mat& cur_img1) {
+	//stereo rectify
+	cv::remap(cur_img0, cur_img0, camera0.rect_map_x, camera0.rect_map_y, cv::INTER_LINEAR);
+	cv::remap(cur_img1, cur_img1, camera1.rect_map_x, camera1.rect_map_y, cv::INTER_LINEAR);
 }
 
 void StereoCamera::detectFeatures(const cv::Mat& img, std::vector<cv::KeyPoint>& kps) {
@@ -158,7 +165,7 @@ void StereoCamera::detectFeatures(const cv::Mat& img, std::vector<cv::KeyPoint>&
 	// std::vector<cv::KeyPoint> kp;
 	// detector->detect(img, kp, cv::Mat());
  //  cv::KeyPointsFilter::removeDuplicated( kp );
-	// cv::KeyPointsFilter::retainBest(kp, MAX_FEATURES);
+	// cv::KeyPointsFilter::retainBest(kp, MAX_FEATURES_PER_CELL);
  //  for(int k=0; k<kp.size(); k++) {
  //  	kps.push_back(kp[k]);
  //  }
@@ -171,7 +178,7 @@ void StereoCamera::detectFeatures(const cv::Mat& img, std::vector<cv::KeyPoint>&
 			std::vector<cv::KeyPoint> kp;
 			detector->detect(img(subRegion),kp, cv::Mat());
 		  cv::KeyPointsFilter::removeDuplicated( kp );
-			cv::KeyPointsFilter::retainBest(kp, ceil(ceil(MAX_FEATURES/KP_BLOCKS)/KP_BLOCKS));
+			cv::KeyPointsFilter::retainBest(kp, MAX_FEATURES_PER_CELL);
   		// std::vector<cv::Point2f> subFeatures0;
 		  // cv::goodFeaturesToTrack(img(subRegion), subFeatures0, INIT_MAX_KP, QUAL_LEVEL, MIN_FEATURE_DIST);
 		  for(int k=0; k<kp.size(); k++) {
@@ -201,7 +208,6 @@ void StereoCamera::triangulateByStereoMatch(KeyFrame& keyframe, const CameraMode
 	descriptor->compute(keyframe.img0, kp0, desc0);
 	descriptor->compute(keyframe.img1, kp1, desc1);
 
-	PointCloud::Ptr point_cloud (new PointCloud);
 	std::vector<cv::Point2f> kp0_in, kp1_in;
   std::vector<cv::DMatch> matches;
 	cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create ("BruteForce");
@@ -209,40 +215,42 @@ void StereoCamera::triangulateByStereoMatch(KeyFrame& keyframe, const CameraMode
   while(i<kp0.size() && kp1[j].pt.y-kp0[i].pt.y > 1.0) i++;
   for(; i<kp0.size(); i++)
   {
-  cv::Mat mask(cv::Mat::zeros(1, desc1.rows, CV_8UC1));
-  bool worthMatch = false;
+	  cv::Mat mask(cv::Mat::zeros(1, desc1.rows, CV_8UC1));
+	  bool worthMatch = false;
 
-  while(j<kp1.size() && kp0[i].pt.y-kp1[j].pt.y > 1.0) j++;
+	  while(j<kp1.size() && kp0[i].pt.y-kp1[j].pt.y > 1.0) j++;
 
-  jj = j;
-  while(jj<kp1.size() && fabs(kp1[jj].pt.y - kp0[i].pt.y) <= 1.0) {
-  	mask.at<uchar>(jj++) = true;
-  	worthMatch = true;
+	  jj = j;
+	  while(jj<kp1.size() && fabs(kp1[jj].pt.y - kp0[i].pt.y) <= 1.0) {
+	  	mask.at<uchar>(jj++) = true;
+	  	worthMatch = true;
+	  }
+
+	  if(!worthMatch) continue;
+
+	  const cv::Mat& query_desc0 = desc0.row(i);
+	  std::vector<cv::DMatch> match_candidates;
+	  matcher->match(query_desc0, desc1, match_candidates, mask);
+
+	  if (match_candidates.empty()) continue;
+	  float d = kp0[i].pt.x - kp1[match_candidates[0].trainIdx].pt.x;
+	  if (!(d > 0 && d<MAX_DISP)) continue;
+
+	  match_candidates[0].queryIdx = i;
+	  matches.push_back(match_candidates[0]);
+
+		kp0_in.push_back(kp0[i].pt);
+		kp1_in.push_back(kp1[match_candidates[0].trainIdx].pt);
   }
 
-  if(!worthMatch) continue;
+  if(DEBUG) {
+	  cv::Mat match_img;
+	  cv::drawMatches(keyframe.img0, kp0, keyframe.img1, kp1, matches, match_img);
+	  cv::imshow("Stereo match", match_img);
+	  cv::waitKey(1);
+	}
 
-  const cv::Mat& query_desc0 = desc0.row(i);
-  std::vector<cv::DMatch> match_candidates;
-  matcher->match(query_desc0, desc1, match_candidates, mask);
-
-  if (match_candidates.empty()) continue;
-  float d = kp0[i].pt.x - kp1[match_candidates[0].trainIdx].pt.x;
-  if (!(d > 0 && d<MAX_DISP)) continue;
-
-  match_candidates[0].queryIdx = i;
-  matches.push_back(match_candidates[0]);
-
-	kp0_in.push_back(kp0[i].pt);
-	kp1_in.push_back(kp1[match_candidates[0].trainIdx].pt);
-  }
-
-  std::vector<cv::Point2f> kp1_in_ori = kp1_in;
-  cv::Mat match_img;
-  cv::drawMatches(keyframe.img0, kp0, keyframe.img1, kp1, matches, match_img);
-  cv::imshow("Stereo match", match_img);
-  cv::waitKey(1);
-
+  // std::vector<cv::Point2f> kp1_in_ori = kp1_in;
 	reconstructor.refinePixel(keyframe.img0, keyframe.img1, kp0_in, kp1_in);
 
   float f = cam.K.at<double>(0,0);
@@ -251,27 +259,18 @@ void StereoCamera::triangulateByStereoMatch(KeyFrame& keyframe, const CameraMode
   float B = cam.stereo.t.at<double>(0,0);
   float fB = f*B;
   for(int i=0; i<kp0_in.size(); i++) {
-  float d = kp0_in[i].x - kp1_in[i].x;
-  if (!(d > 0 && d<MAX_DISP)) {
-  	std::cout<<"d= "<<d<<std::endl;
-  	continue;
+	  float d = kp0_in[i].x - kp1_in[i].x;
+	  if (!(d > 0 && d<MAX_DISP)) {
+	  	std::cout<<"d= "<<d<<std::endl;
+	  	continue;
+	  }
+	// std::cout<<kp1_in_ori[i].x<<" - "<<kp1_in[i].x<<std::endl;
+	  float z = fB / d;
+	  float x = (kp0_in[i].x - cx) * z / f;
+	  float y = (kp0_in[i].y - cy) * z / f;
+	  keyframe.feature_points.features.push_back(kp0_in[i]);
+	  keyframe.feature_points.points.push_back(cv::Point3f(x,y,z));
   }
-// std::cout<<kp1_in_ori[i].x<<" - "<<kp1_in[i].x<<std::endl;
-  float z = fB / d;
-  float x = (kp0_in[i].x - cx) * z / f;
-  float y = (kp0_in[i].y - cy) * z / f;
-  keyframe.feature_points.features.push_back(kp0_in[i]);
-  keyframe.feature_points.points.push_back(cv::Point3f(x,y,z));
-
-  pcl::PointXYZ p;
-  p.x = x;
-  p.y = y;
-  p.z = z;
-  point_cloud->push_back(p);
-  }
-
-  point_cloud->header.frame_id = "/map";
-  stereo_pcl_pub.publish(point_cloud);
 
 	// std::cout << "triangulateByStereoMatch: " << (std::clock() - triangulateByStereoMatch_start) / (double)(CLOCKS_PER_SEC / 1000) << " ms" << std::endl;
 }
@@ -285,23 +284,31 @@ KeyFrame StereoCamera::createKeyFrame(const Pose& cur_pose, const cv::Mat& cur_i
 	keyframe.img1 = cur_img1.clone();
 
 	if(feature_points.features.empty()) {
+		if(DEBUG) std::cout<<"triangulateByStereoMatch"<<std::endl;
 		triangulateByStereoMatch(keyframe, cam0);		// use stereo match to triangulate points if necessary
 	} else {
 	  keyframe.feature_points = feature_points;
 	}
 
-	// publish point cloud
-	PointCloud::Ptr point_cloud (new PointCloud);
+	// publish point cloud in world coordinate
+	Eigen::Matrix3d _R = cur_pose.orientation.toRotationMatrix()*cam0.R_C2B;
+	Eigen::Vector3d _t = cur_pose.orientation.toRotationMatrix()*cam0.t_C2B+cur_pose.position;
+	cv::Mat R, t;
+	cv::eigen2cv(_R, R);
+	cv::eigen2cv(_t, t);
 	for(int i=0; i<keyframe.feature_points.points.size(); i++) {
-		// std::cout<<lastKF_pts[i]<<std::endl;
+		cv::Mat pts_cur = cv::Mat(keyframe.feature_points.points[i]);
+		pts_cur.convertTo(pts_cur, CV_64F);
+		cv::Mat pts_w = R*pts_cur + t;
+
 		pcl::PointXYZ p;
-		p.x = keyframe.feature_points.points[i].y;
-		p.y = keyframe.feature_points.points[i].z;
-		p.z = keyframe.feature_points.points[i].x;
+		p.x = pts_w.at<double>(0);
+		p.y = pts_w.at<double>(1);
+		p.z = pts_w.at<double>(2);
 		point_cloud->push_back(p);
 	}
 	point_cloud->header.frame_id = "/map";
-	direct_pcl_pub.publish(point_cloud);
+	pcl_pub.publish(point_cloud);
 
   // detect feature points
   std::vector<cv::KeyPoint> kp0;
@@ -310,19 +317,17 @@ KeyFrame StereoCamera::createKeyFrame(const Pose& cur_pose, const cv::Mat& cur_i
 		keyframe.features0.push_back(kp0[i].pt);
 	}
 
-  keyframe.init_feature0_count = keyframe.features0.size();
   // // put previous features into new KF for consistency
   // for(int i=0; i<feature_points.features.size(); i++) {
   // 	keyframe.features0.push_back(feature_points.features[i]);
   // }
 
-  if(DEBUG_FEATURE) {
+  if(DEBUG) {
 	  cv::Mat feature_img = keyframe.img0.clone();
 	  cv::cvtColor(feature_img, feature_img, cv::COLOR_GRAY2BGR);
 	  for(int i=0; i<keyframe.features0.size(); i++) {
 	  	cv::circle(feature_img, keyframe.features0[i], 5, cv::Scalar(0,255,0));
 	  }
-	  std::cout<<"KF init features "<<keyframe.features0.size()<<std::endl;
 	  cv::imshow("KF init features", feature_img);
 	  cv::waitKey(1);
 	}

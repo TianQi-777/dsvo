@@ -59,9 +59,8 @@ struct KeyFrame {
 	Pose pose;
 	double time;
 	cv::Mat img0;
-    std::vector<cv::Point2f> features0;
-    FeaturePoints feature_points;
-    int init_feature0_count;
+  std::vector<cv::Point2f> features0;
+  FeaturePoints feature_points;
 	cv::Mat img1;
 };
 

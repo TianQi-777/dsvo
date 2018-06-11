@@ -25,6 +25,15 @@ void State::showPose() {
 	pose.header.frame_id = "/map";
 	pose.header.stamp = time;
 
+	// pose.pose.position.x = this->pose.position[0];
+	// pose.pose.position.y = this->pose.position[2];
+	// pose.pose.position.z = -this->pose.position[1];
+	//
+	// pose.pose.orientation.w = this->pose.orientation.w();
+	// pose.pose.orientation.x = this->pose.orientation.x();
+	// pose.pose.orientation.y = this->pose.orientation.z();
+	// pose.pose.orientation.z = -this->pose.orientation.y();
+
 	pose.pose.position.x = this->pose.position[0];
 	pose.pose.position.y = this->pose.position[2];
 	pose.pose.position.z = -this->pose.position[1];
@@ -33,15 +42,6 @@ void State::showPose() {
 	pose.pose.orientation.x = this->pose.orientation.x();
 	pose.pose.orientation.y = this->pose.orientation.z();
 	pose.pose.orientation.z = -this->pose.orientation.y();
-
-	// pose.pose.position.x = this->pose.position[0];
-	// pose.pose.position.y = this->pose.position[2];
-	// pose.pose.position.z = -this->pose.position[1];
-
-	// pose.pose.orientation.w = this->pose.orientation.w();
-	// pose.pose.orientation.x = this->pose.orientation.x();
-	// pose.pose.orientation.y = this->pose.orientation.z();
-	// pose.pose.orientation.z = -this->pose.orientation.y();
 
 	pose_pub.publish(pose);
 }

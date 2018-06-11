@@ -27,9 +27,9 @@
 
 class Reconstructor {
 public:
-	void reconstructAndBundleAdjust(std::vector<cv::Point2f>& features0, std::vector<cv::Point2f>& features1, 
+	void reconstructAndBundleAdjust(std::vector<cv::Point2f>& features0, std::vector<cv::Point2f>& features1,
 						  const cv::Mat& K, cv::Mat& R, cv::Mat& t, int max_opt_step, int max_reproj_dist,
-						  std::vector<PointWithUncertainty>& pts, cv::Mat& reproj_img);
+						  std::vector<PointWithUncertainty>& pts);
 
 	void refinePixel(const cv::Mat& src_img, const cv::Mat& dest_img, const std::vector<cv::Point2f>& src_fts, std::vector<cv::Point2f>& dest_fts);
 

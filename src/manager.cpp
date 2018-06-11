@@ -67,6 +67,7 @@ void Manager::imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, 
 	cv::cvtColor(cur_img0, cur_img0, CV_BGR2GRAY);
 	cv::cvtColor(cur_img1, cur_img1, CV_BGR2GRAY);
 
+	stereo_cam->stereo_rectify(cur_img0, cur_img1);
 	stereo_cam->track(state, cur_img0, cur_img1, img0_cptr->header.stamp.toSec());
 
 	return;
