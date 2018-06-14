@@ -11,6 +11,11 @@ struct Pose
 {
 	Eigen::Vector3d position;
 	Eigen::Quaterniond orientation;
+
+	Pose() {
+		position = Eigen::Vector3d::Zero();
+		orientation = Eigen::Quaterniond::Identity();
+	}
 };
 
 struct State {
@@ -26,5 +31,4 @@ struct State {
 	void showPose();
 };
 
-#endif 
-
+#endif

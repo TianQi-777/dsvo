@@ -24,7 +24,7 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "stereo_camera/edge_se3m.h"
+#include "stereo_camera/g2o_edges/edge_se3m.h"
 #include "/home/jiawei/workspace/g2o/g2o/types/slam3d/isometry3d_gradients.h"
 #include <iostream>
 
@@ -42,7 +42,7 @@ namespace g2o {
 
   bool EdgeSE3M::read(std::istream& is) {
     Vector7 meas;
-    for (int i=0; i<7; i++) 
+    for (int i=0; i<7; i++)
       is >> meas[i];
     // normalize the quaternion to recover numerical precision lost by storing as human readable text
     Vector4::MapType(meas.data()+3).normalize();
@@ -60,7 +60,7 @@ namespace g2o {
     if (is.bad()) {
       //  we overwrite the information matrix with the Identity
       information().setIdentity();
-    } 
+    }
     return true;
   }
 
@@ -88,9 +88,9 @@ namespace g2o {
     setMeasurement(delta);
     return true;
   }
-  
+
   void EdgeSE3M::linearizeOplus(){
-    
+
     // BaseBinaryEdge<6, Isometry3, VertexSE3, VertexSE3>::linearizeOplus();
     // return;
 

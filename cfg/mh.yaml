@@ -1,43 +1,45 @@
 !!python/object/new:dynamic_reconfigure.encoding.Config
 dictitems:
+  BA_INLIER_THRES: 0.7
   BA_MAX_STEP: 50
+  BA_REPROJ_DIST: 1.0
   BLUR_SZ: 3
   BLUR_VAR: 0.5
   DEBUG: false
-  FAST_THRES: 20
+  FEATURES_PER_CELL: 1
+  FEATURE_BLOCKS: 12
   FEATURE_OF_PYMD: 2
-  INIT_SCALE: 0.1
-  KP_BLOCKS: 10
+  FEATURE_THRES: 20
+  KF_DIST: 0.3
   LOOP_CLOSURE: false
-  MAX_FEATURES_PER_CELL: 1
-  MAX_REPROJ_DIST: 1
-  MIN_TRACK_DIST: 0.1
-  MIN_TRACK_POINTS: 20
-  MONO_INLIER_THRES: 0.5
-  PROP_POSE_ITER: 50
-  PROP_POSE_PYMD: 2
+  PROP_MAX_STEP: 20
+  PROP_MIN_POINTS: 20
+  PROP_PROJ_DIST: 5.0
+  PROP_PTS_RATIO: 0.7
+  PROP_PYMD: 2
   REFINE_PIXEL: false
   SCALE_MAX_STEP: 50
   SCALE_PYMD: 2
   TEST_STEREO: false
   groups: !!python/object/new:dynamic_reconfigure.encoding.Config
     dictitems:
+      BA_INLIER_THRES: 0.7
       BA_MAX_STEP: 50
+      BA_REPROJ_DIST: 1.0
       BLUR_SZ: 3
       BLUR_VAR: 0.5
       DEBUG: false
-      FAST_THRES: 20
+      FEATURES_PER_CELL: 1
+      FEATURE_BLOCKS: 12
       FEATURE_OF_PYMD: 2
-      INIT_SCALE: 0.1
-      KP_BLOCKS: 10
+      FEATURE_THRES: 20
+      KF_DIST: 0.3
       LOOP_CLOSURE: false
-      MAX_FEATURES_PER_CELL: 1
-      MAX_REPROJ_DIST: 1
-      MIN_TRACK_DIST: 0.1
-      MIN_TRACK_POINTS: 20
-      MONO_INLIER_THRES: 0.5
-      PROP_POSE_ITER: 50
-      PROP_POSE_PYMD: 2
+      PROP_MAX_STEP: 20
+      PROP_MIN_POINTS: 20
+      PROP_PROJ_DIST: 5.0
+      PROP_PTS_RATIO: 0.7
+      PROP_PYMD: 2
       REFINE_PIXEL: false
       SCALE_MAX_STEP: 50
       SCALE_PYMD: 2

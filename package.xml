@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>direct_stereo</name>
+  <name>dsvo</name>
   <version>0.0.0</version>
-  <description>The direct_stereo package</description>
+  <description>The dsvo package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->

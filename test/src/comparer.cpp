@@ -1,4 +1,4 @@
-#include "comparers/comparer.hpp"
+#include "comparer.hpp"
 
 Comparer::Comparer() {}
 

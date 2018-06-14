@@ -15,7 +15,7 @@
 #include "g2o/solvers/csparse/linear_solver_csparse.h"
 #include <g2o/solvers/cholmod/linear_solver_cholmod.h>
 #include <g2o/solvers/dense/linear_solver_dense.h>
-#include "helper.hpp"
+#include "../helper.hpp"
 
 class PoseEdge:public g2o::BaseUnaryEdge<1, ScaleBatch, g2o::VertexSE3Expmap>
 {

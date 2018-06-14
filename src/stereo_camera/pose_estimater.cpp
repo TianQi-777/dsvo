@@ -1,11 +1,9 @@
 #include "stereo_camera/pose_estimater.hpp"
+bool DEBUG_POSE = false;
 
-double PoseEstimater::poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, const std::vector<cv::Point2f>& fts, const cv::Mat& source_img, const cv::Mat& dest_img, const Eigen::Matrix3d& K, Eigen::Matrix3d& R, Eigen::Vector3d& t, int iter){
+double PoseEstimater::poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, const std::vector<double>& uncertainties, const std::vector<cv::Point2f>& fts,
+																			 const cv::Mat& source_img, const cv::Mat& dest_img, const Eigen::Matrix3d& K, Eigen::Matrix3d& R, Eigen::Vector3d& t, int iter){
 	g2o::SparseOptimizer poseOptimizer;
-
-	// g2o::BlockSolver<g2o::BlockSolverTraits<6,1>>::LinearSolverType* linearSolver = new g2o::LinearSolverDense<g2o::BlockSolver<g2o::BlockSolverTraits<6,1>>::PoseMatrixType>();
-	// g2o::BlockSolver<g2o::BlockSolverTraits<6,1>>* solver_ptr = new g2o::BlockSolver<g2o::BlockSolverTraits<6,1>>(linearSolver);
-	// g2o::OptimizationAlgorithmLevenberg* algorithm = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
 
 	std::unique_ptr<g2o::BlockSolver<g2o::BlockSolverTraits<6,1>>::LinearSolverType> linearSolver;
 	linearSolver = g2o::make_unique<g2o::LinearSolverCholmod<g2o::BlockSolver<g2o::BlockSolverTraits<6,1>>::PoseMatrixType>>();
@@ -23,9 +21,10 @@ double PoseEstimater::poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, 
 		PoseEdge* edge = new PoseEdge(pts[i], K, dest_img);
 		edge->setVertex(0, pose);
 		ScaleBatch batch;
-		getBatchAround(source_img,fts[i].x,fts[i].y,batch);
+		helper::getBatchAround(source_img,fts[i].x,fts[i].y,batch);
 		edge->setMeasurement(batch);
 		edge->setInformation(Eigen::Matrix<double,1,1>::Identity());
+		// edge->setInformation((1.0/uncertainties[i])*Eigen::Matrix<double,1,1>::Identity());
     edge->setRobustKernel( new g2o::RobustKernelHuber() );
 		edge->setId(i+1);
 
@@ -84,17 +83,82 @@ double PoseEstimater::poseEstimate(const FeaturePoints& fts_pts, const cv::Mat& 
 	double dist = 0.0;
 	for(int i=pymd-1; i>=0; i--)
 	{
-		// cv::Mat proj_img = dest_img.clone();
-		// project3DPtsToImg(fts_pts.points, K, R, t, proj_img);
-		// cv::imshow("Pose projection", proj_img);
-		// cv::waitKey();
-		dist = poseEstimatePymd(pts_eigen, fts_pymd[i], source_img_pymd[i], dest_img_pymd[i], K_pymd[i], R, t, iter);
+		if(DEBUG_POSE)
+		{
+			cv::Mat proj_img = dest_img.clone();
+			helper::project3DPtsToImg(fts_pts.points, K, R, t, proj_img);
+			cv::imshow("Pose projection"+std::to_string(i), proj_img);
+			cv::waitKey(1);
+		}
+		dist = poseEstimatePymd(pts_eigen, fts_pts.uncertainties, fts_pymd[i], source_img_pymd[i], dest_img_pymd[i], K_pymd[i], R, t, iter);
 	}
-		// cv::Mat proj_img = dest_img.clone();
-		// project3DPtsToImg(fts_pts.points, K, R, t, proj_img);
-		// cv::imshow("Pose projection", proj_img);
-		// cv::waitKey();
-
-	assert(dist>0.0);
+		if(DEBUG_POSE)
+		{
+			cv::Mat proj_img = dest_img.clone();
+			helper::project3DPtsToImg(fts_pts.points, K, R, t, proj_img);
+			cv::imshow("Pose projection"+std::to_string(0), proj_img);
+			cv::waitKey(1);
+		}
 	return dist;
+}
+
+void PoseEstimater::refine_pose(const PointsWithUncertainties& points, const std::vector<cv::Point2f>& features, const cv::Mat& K, Eigen::Matrix3d& R, Eigen::Vector3d& t)
+{
+	assert(points.size()==features.size());
+
+	// set up optimizer
+	g2o::SparseOptimizer optimizer;
+	std::unique_ptr<g2o::BlockSolver_6_3::LinearSolverType> linearSolver;
+	linearSolver = g2o::make_unique<g2o::LinearSolverCholmod<g2o::BlockSolver_6_3::PoseMatrixType>>();
+	g2o::OptimizationAlgorithmLevenberg* algorithm = new g2o::OptimizationAlgorithmLevenberg(
+	    g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
+
+  optimizer.setAlgorithm( algorithm );
+  optimizer.setVerbose( false );
+
+  // add camera parameters
+	double fx = K.at<double>(0,0);
+	double fy = K.at<double>(1,1);
+	double cx = K.at<double>(0,2);
+	double cy = K.at<double>(1,2);
+  g2o::CameraParameters* cam = new g2o::CameraParameters( fx, Eigen::Vector2d(cx, cy), 0 );
+  cam->setId(0);
+	if (!optimizer.addParameter(cam)) assert(false);
+
+  // add pose
+  g2o::VertexSE3Expmap* v_pose = new g2o::VertexSE3Expmap();
+  v_pose->setId(0);
+  v_pose->setEstimate( g2o::SE3Quat(R, t) );
+  optimizer.addVertex( v_pose );
+
+  for ( size_t i=0; i<points.size(); i++ )
+  {
+      // add points
+      g2o::VertexSBAPointXYZ* v_points = new g2o::VertexSBAPointXYZ();
+      v_points->setId( 1 + i );
+			v_points->setFixed( true );
+      v_points->setMarginalized(true);
+      v_points->setEstimate(Eigen::Vector3d(points.points[i].x,points.points[i].y,points.points[i].z));
+      optimizer.addVertex( v_points );
+
+      // project to features
+      g2o::EdgeProjectXYZ2UV*  edge = new g2o::EdgeProjectXYZ2UV();
+      edge->setVertex( 0, dynamic_cast<g2o::VertexSBAPointXYZ*>   (v_points) );
+      edge->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (v_pose)   );
+      edge->setMeasurement( Eigen::Vector2d(features[i].x, features[i].y ) );
+			// edge->setInformation(  Eigen::Matrix2d::Identity() );
+      edge->setInformation( 1/points.uncertainties[i] * Eigen::Matrix2d::Identity() );
+      edge->setParameterId(0, 0);
+      edge->setRobustKernel( new g2o::RobustKernelHuber() );
+      optimizer.addEdge( edge );
+  }
+
+  // optimizer.setVerbose(true);
+  optimizer.initializeOptimization();
+  optimizer.optimize(50);				// TODO
+
+  g2o::VertexSE3Expmap* v = dynamic_cast<g2o::VertexSE3Expmap*>( optimizer.vertex(0) );
+  Eigen::Isometry3d pose = v->estimate();
+  R = pose.rotation();
+  t = pose.translation();
 }

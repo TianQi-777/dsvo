@@ -1,4 +1,4 @@
-#include "comparers/point_comparer.hpp"
+#include "point_comparer.hpp"
 
 PointComparer::PointComparer() {
 	gt_sub = nh.subscribe("/leica/position", 1000, &PointComparer::gt_Callback, this);

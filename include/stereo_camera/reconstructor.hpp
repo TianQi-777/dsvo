@@ -10,8 +10,6 @@
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/plot.hpp>
 
-#include "stereo_camera/pixel_edge.hpp"
-
 #include <g2o/core/sparse_optimizer.h>
 #include <g2o/core/block_solver.h>
 #include <g2o/core/robust_kernel.h>
@@ -27,10 +25,8 @@
 
 class Reconstructor {
 public:
-	void reconstructAndBundleAdjust(std::vector<cv::Point2f>& features0, std::vector<cv::Point2f>& features1,
-						  const cv::Mat& K, cv::Mat& R, cv::Mat& t, int max_opt_step, int max_reproj_dist,
-						  std::vector<PointWithUncertainty>& pts);
+	void reconstructAndBundleAdjust(KFData& kf_data,	const cv::Mat& K, int max_opt_step, double max_reproj_dist);
 
-	void refinePixel(const cv::Mat& src_img, const cv::Mat& dest_img, const std::vector<cv::Point2f>& src_fts, std::vector<cv::Point2f>& dest_fts);
+	// void refinePixel(const cv::Mat& src_img, const cv::Mat& dest_img, const std::vector<cv::Point2f>& src_fts, std::vector<cv::Point2f>& dest_fts);
 
 };

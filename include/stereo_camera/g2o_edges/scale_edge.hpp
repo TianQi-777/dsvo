@@ -3,8 +3,8 @@
 #include <Eigen/Geometry>
 #include <iostream>
 
-#include "data.hpp"
-#include "helper.hpp"
+#include "../data.hpp"
+#include "../helper.hpp"
 
 #include "g2o/core/sparse_optimizer.h"
 #include "g2o/core/block_solver.h"
@@ -46,7 +46,7 @@ class VertexScale : public g2o::BaseVertex<1, double>
 
     virtual void oplusImpl(const double* update)
     {
-      // cout<<_estimate<<" + "<<*update<<endl;                
+      // cout<<_estimate<<" + "<<*update<<endl;
       _estimate += *update;
     }
 };

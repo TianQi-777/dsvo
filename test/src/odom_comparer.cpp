@@ -1,4 +1,4 @@
-#include "comparers/odom_comparer.hpp"
+#include "odom_comparer.hpp"
 
 OdomComparer::OdomComparer() {
 	gt_sub = nh.subscribe("/odom", 1000, &OdomComparer::gt_Callback, this);

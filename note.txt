@@ -1,0 +1,18 @@
+Tasks:
+  mh.yaml for grass
+
+  optimize optimizers
+
+  optimize debug mode
+
+  nodelet multithread
+
+  cv::remap slow
+
+  2 cameras fusing
+
+
+Notes:
+  rosparam set use_sim_time true
+  rosbag play --clock sptam.bag -s 90 -u 30
+  roslaunch sptam euroc.launch

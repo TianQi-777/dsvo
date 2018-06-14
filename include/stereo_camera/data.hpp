@@ -26,14 +26,23 @@ struct StereoModel
 	cv::Mat t;
 };
 
-struct PointWithUncertainty
+struct PointsWithUncertainties
 {
-	cv::Point3d point;
-	double uncertainty;
+	std::vector<cv::Point3f> points;
+	std::vector<double> uncertainties;
 
-	PointWithUncertainty(const cv::Point3d& p, double u) {
-		point = p;
-		uncertainty = u;
+	void push_back(const cv::Point3f& point, double uncertainty) {
+		points.push_back(point);
+		uncertainties.push_back(uncertainty);
+	}
+
+	void clear() {
+		points.clear();
+		uncertainties.clear();
+	}
+
+	int size() const {
+		return points.size();
 	}
 };
 
@@ -42,6 +51,22 @@ struct FeaturePoints
 	std::vector<cv::Point2f> features;
 	std::vector<cv::Point3f> points;
 	std::vector<double> uncertainties;
+
+	void push_back(const cv::Point2f& feature, const cv::Point3f& point, double uncertainty) {
+		features.push_back(feature);
+		points.push_back(point);
+		uncertainties.push_back(uncertainty);
+	}
+
+	void clear() {
+		features.clear();
+		points.clear();
+		uncertainties.clear();
+	}
+
+	int size() {
+		return points.size();
+	}
 };
 
 struct CameraModel {
@@ -58,33 +83,45 @@ struct CameraModel {
 struct KeyFrame {
 	Pose pose;
 	double time;
-	cv::Mat img0;
-  std::vector<cv::Point2f> features0;
-  FeaturePoints feature_points;
-	cv::Mat img1;
+	cv::Mat img0;															// left frame
+	cv::Mat img1;															// right frame
+  std::vector<cv::Point2f> new_features;		// feature points for new keyframe
+  FeaturePoints feature_points;							// points in local frame, could be transforred to world frame by pose
+	int feature_points_init_count;
 };
 
 struct Frame {
-	Pose pose;
-	double time;
+	Pose pose_from_lastKF;
 	cv::Mat img;
-    std::vector<cv::Point2f> features;
-    FeaturePoints feature_points;
+  std::vector<cv::Point2f> features;
+  FeaturePoints feature_points;
 };
 
-struct  FeatureTrackingResult
+struct  KFData
 {
+	double MAX_UNCERTAINTY = 999999.9;
+
   std::vector<cv::Point2f> lastKF_features;
-  std::vector<cv::Point2f> cur_features;
+	std::vector<cv::Point2f> cur_features;
+  PointsWithUncertainties points;
 	cv::Mat R_lastKF2Cur;
 	cv::Mat t_lastKF2Cur;
 
-	FeatureTrackingResult(const std::vector<cv::Point2f>& _lastKF_features, const std::vector<cv::Point2f>& _cur_features, const cv::Mat& _R_lastKF2Cur, const cv::Mat& _t_lastKF2Cur) {
-		assert(_last_features.size() == _cur_features.size());
-  	lastKF_features=_lastKF_features;
-  	cur_features=_cur_features;
+	KFData(const cv::Mat& _R_lastKF2Cur, const cv::Mat& _t_lastKF2Cur, const FeaturePoints& fts_pts, const std::vector<cv::Point2f>& fts, const std::vector<cv::Point2f>& fts0, const std::vector<cv::Point2f>& fts1) {
 		R_lastKF2Cur = _R_lastKF2Cur;
 		t_lastKF2Cur = _t_lastKF2Cur;
+
+		lastKF_features.insert(lastKF_features.end(), fts_pts.features.begin(), fts_pts.features.end());
+		cur_features.insert(cur_features.end(), fts.begin(), fts.end());
+		points.points.insert(points.points.end(), fts_pts.points.begin(), fts_pts.points.end());
+		points.uncertainties.insert(points.uncertainties.end(), fts_pts.uncertainties.begin(), fts_pts.uncertainties.end());
+
+		lastKF_features.insert(lastKF_features.end(), fts0.begin(), fts0.end());
+		cur_features.insert(cur_features.end(), fts1.begin(), fts1.end());
+		for(int i=0; i<fts0.size(); i++) {
+			points.points.push_back(cv::Point3f(-1,-1,-1));
+			points.uncertainties.push_back(MAX_UNCERTAINTY);
+		}
 	}
 };
 

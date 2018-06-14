@@ -15,7 +15,7 @@
 #include "helper.hpp"
 
 #include "stereo_camera/pose_estimater.hpp"
-#include "stereo_camera/edge_se3m.h"
+#include "stereo_camera/g2o_edges/edge_se3m.h"
 
 class LocalKFOptimizer{
 private:

@@ -1,4 +1,4 @@
-#include "stereo_camera/pose_edge.hpp"
+#include "stereo_camera/g2o_edges/pose_edge.hpp"
 #include <g2o/core/factory.h>
 
 #include <iostream>
@@ -20,10 +20,10 @@ void PoseEdge::computeError()
         this->setLevel ( 1 );
         return;
     }
-	else 
+	else
 	{
         ScaleBatch batch;
-        getBatchAround(dest_img, u, v, batch);
+        helper::getBatchAround(dest_img, u, v, batch);
 		_error(0,0) = (batch - _measurement).sum() / BATCH_SIZE / BATCH_SIZE;
         // cout<<"start_point"<<endl<<start_point<<endl<<"proj_point"<<endl<<proj_point<<endl<<"u"<<u<<" v "<<v<<endl<<"batch\t"<<batch<<endl<<"_meas\t"<<_measurement<<endl<<endl;
 	}
@@ -66,12 +66,12 @@ void PoseEdge::linearizeOplus()
 
     Eigen::Matrix<double, 1, 2> jacobian_pixel_uv;
 
-    jacobian_pixel_uv ( 0,0 ) = ( getPixelValue (dest_img, u+1, v )-getPixelValue (dest_img, u, v ) );
-    jacobian_pixel_uv ( 0,1 ) = ( getPixelValue (dest_img, u, v+1 )-getPixelValue (dest_img, u, v ) );
+    jacobian_pixel_uv ( 0,0 ) = ( helper::getPixelValue (dest_img, u+1, v )-helper::getPixelValue (dest_img, u, v ) );
+    jacobian_pixel_uv ( 0,1 ) = ( helper::getPixelValue (dest_img, u, v+1 )-helper::getPixelValue (dest_img, u, v ) );
 
     _jacobianOplusXi = jacobian_pixel_uv*jacobian_uv_ksai;
 
-    // if(_jacobianOplusXi.norm()<1000) 
+    // if(_jacobianOplusXi.norm()<1000)
     // {
     //     _jacobianOplusXi = Eigen::Matrix<double, 1, 6>::Zero();
     //     this->setLevel ( 1 );

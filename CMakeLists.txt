@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(direct_stereo)
+project(dsvo)
 
 set( CMAKE_BUILD_TYPE Release )
 set( CMAKE_CXX_FLAGS "-std=c++11" )
@@ -14,7 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 generate_dynamic_reconfigure_options(
-  cfg/DirectStereo.cfg
+  cfg/dsvo.cfg
 )
 
 LIST( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules )
@@ -27,12 +27,28 @@ INCLUDE_DIRECTORIES( ${G2O_INCLUDE_DIR} ${CSPARSE_INCLUDE_DIR} ${EIGEN3_INCLUDE_
 
 catkin_package()
 
-include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS} include)
+include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS} include test/include)
 
-add_executable(manager_node src/manager_node.cpp src/manager.cpp src/state.cpp src/comparers/comparer.cpp src/comparers/odom_comparer.cpp src/comparers/point_comparer.cpp src/comparers/trans_comparer.cpp src/stereo_camera/stereo_camera.cpp src/stereo_camera/stereo_camera_helpers.cpp src/stereo_camera/reconstructor.cpp src/stereo_camera/scale_edge.cpp src/stereo_camera/scale_optimizer.cpp src/stereo_camera/local_KF_optimizer.cpp src/stereo_camera/pose_edge.cpp src/stereo_camera/pose_estimater.cpp src/stereo_camera/edge_se3m.cpp src/stereo_camera/pixel_edge.cpp)
+add_executable(manager_node
+  src/stereo_camera/g2o_edges/scale_edge.cpp
+  src/stereo_camera/g2o_edges/pose_edge.cpp
+  src/stereo_camera/g2o_edges/edge_se3m.cpp
+  test/src/odom_comparer.cpp
+  test/src/point_comparer.cpp
+  test/src/trans_comparer.cpp
+  test/src/comparer.cpp
+  src/manager_node.cpp
+  src/manager.cpp
+  src/state.cpp
+  src/stereo_camera/stereo_camera.cpp
+  src/stereo_camera/stereo_camera_helpers.cpp
+  src/stereo_camera/reconstructor.cpp
+  src/stereo_camera/scale_optimizer.cpp
+  src/stereo_camera/local_KF_optimizer.cpp
+  src/stereo_camera/pose_estimater.cpp)
 
-add_executable(zed_split src/stereo_camera/zed_split.cpp)
-add_executable(kitti_pub src/stereo_camera/kitti_pub.cpp)
+add_executable(zed_split src/tools/zed_split.cpp)
+add_executable(kitti_pub src/tools/kitti_pub.cpp)
 
 add_dependencies(manager_node ${PROJECT_NAME}_gencfg)
 

@@ -1,13 +1,6 @@
 #ifndef STEREO_CAMERA_HPP
 #define STEREO_CAMERA_HPP
 
-#include <dynamic_reconfigure/server.h>
-#include <direct_stereo/DirectStereoConfig.h>
-#include "data.hpp"
-#include "helper.hpp"
-#include "reconstructor.hpp"
-#include "scale_optimizer.hpp"
-#include "local_KF_optimizer.hpp"
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <opencv2/core.hpp>
@@ -22,90 +15,99 @@
 #include <dynamic_reconfigure/server.h>
 #include <pcl_ros/point_cloud.h>
 #include <geometry_msgs/PoseStamped.h>
-#include "geometry_msgs/PointStamped.h"
-#include "state.hpp"
 #include <string>
 #include <ctime>
-#include <thread>
+#include <cmath>
 
-#include "comparers/comparer.hpp"
-#include "comparers/odom_comparer.hpp"
-#include "comparers/point_comparer.hpp"
-#include "comparers/trans_comparer.hpp"
+#include "dsvo/dsvoConfig.h"
+#include "data.hpp"
+#include "state.hpp"
+#include "helper.hpp"
+#include "pose_estimater.hpp"
+#include "reconstructor.hpp"
+#include "scale_optimizer.hpp"
+#include "local_KF_optimizer.hpp"
+#include "comparer.hpp"
+#include "odom_comparer.hpp"
+#include "point_comparer.hpp"
+#include "trans_comparer.hpp"
 
-typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
-
-struct KeyPoint12_LessThan_y
-{
-    bool operator()(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2) const
-    {
-        return kp1.pt.y < kp2.pt.y;
-    }
-};
+typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 
 class StereoCamera
 {
 private:
 	// parameters
-  int OF_size = 11;		// optical flow size
-	float MAX_VEL = 10;
-	double MAX_SCALE = 10;
-	int MAX_REPROJ_DIST, KP_BLOCKS, INIT_MAX_KP, BA_MAX_STEP, SCALE_MAX_STEP, SCALE_PYMD, MIN_FEATURE_DIST, PROP_POSE_PYMD, PROP_POSE_ITER, BLUR_SZ, FAST_THRES, MAX_FEATURES_PER_CELL, MIN_TRACK_POINTS;
-	int FEATURE_OF_PYMD;
-	double MONO_INLIER_THRES, QUAL_LEVEL, BLUR_VAR, MIN_TRACK_DIST, INIT_SCALE;
-	bool LOOP_CLOSURE, REFINE_PIXEL, DEBUG, TEST_STEREO;
+  int OF_size = 11;       // optical flow size
+	float MAX_VEL = 3;      // max pose propagation velocity
 
+  int BLUR_SZ;            // blur size
+  double BLUR_VAR;        // blur value
+	int FEATURE_BLOCKS;     // divide img to blocks for feature detection
+  int FEATURE_THRES;      // FAST threshold
+  int FEATURES_PER_CELL;  // # of features in each block cell
+	int FEATURE_OF_PYMD;    // feature tracking pyramid
+  int PROP_PYMD;          // pose propagation pyramid
+  int PROP_MAX_STEP;      // max step for pose propagation
+  double PROP_PROJ_DIST;  // max projection distance for pose propagation
+  double PROP_PTS_RATIO;  // minimal inlier ratio for successful pose propagation
+  int PROP_MIN_POINTS;    // min # of features for pose propagation
+  double KF_DIST;         // minimal Keyframe distance
+  double BA_INLIER_THRES; // minimal inlier ratio for successful bundle adjustment
+	double BA_REPROJ_DIST;  // bundle adjustment max reprojection distance
+  int BA_MAX_STEP;        // max step for bundle adjustment
+  int SCALE_PYMD;         // scale optimization pyramid
+  int SCALE_MAX_STEP;     // max step for scale optimization
+	bool LOOP_CLOSURE;      // flag for local loop detection and optimization
+  bool REFINE_PIXEL;      // refine stereo match after scale optimization
+  bool DEBUG;             // debug mode, inspecting frame by frame
+  bool TEST_STEREO;       // test pure stereo match mode
+
+  // ros modules
 	ros::NodeHandle nh;
 	ros::Publisher pcl_pub;
-	ros::Publisher pose_pub;
-	dynamic_reconfigure::Server<direct_stereo::DirectStereoConfig> server;
-	dynamic_reconfigure::Server<direct_stereo::DirectStereoConfig>::CallbackType f;
+	dynamic_reconfigure::Server<dsvo::dsvoConfig> server;
+	dynamic_reconfigure::Server<dsvo::dsvoConfig>::CallbackType f;
 
+  // stereo components
 	CameraModel camera0;
 	CameraModel camera1;
-	cv::Size frame_size;
 	Frame last_frame0;
 	Frame last_frame1;
 	std::vector<KeyFrame> keyframes0;
 	std::vector<KeyFrame> keyframes1;
 	bool param_changed;
-	cv::Mat cam0_Q;	//comparison with stereo match
 
+  // components for testing
+	Comparer* comparer;
+	std::ofstream time_ofs;
+  PointCloud::Ptr point_cloud;
+  bool stereo_match_flag;     // stereo match is called if dsvo failed to generate points
+	void truth_Callback(const geometry_msgs::PointStamped::ConstPtr& msg);
+
+  // record times
+  double init_time=-1.0;
+  double last_time;
+  double cur_time;
+
+  // core dsvo modules
+	PoseEstimater pose_estimater;
 	Reconstructor reconstructor;
 	ScaleOptimizer scale_optimizer;
 	LocalKFOptimizer local_KF_optimizer;
-	PoseEstimater pose_estimater;
+	void monoTrack(State& cur_state, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const CameraModel& cam0, const CameraModel& cam1, Frame& last_frame, std::vector<KeyFrame>& keyframes, const std::string& window_name);
+ 	bool propagateState(State& cur_state, const cv::Mat& cur_img, KeyFrame& lastKF, Frame& last_frame, const CameraModel& cam, FeaturePoints& cur_feature_points);
+ 	void featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::Mat& cur_img, std::vector<cv::Point2f>& cur_features);
+	bool reconstructAndOptimize(KFData& kf_data, const KeyFrame& lastKF,
+								const CameraModel& cam0, const CameraModel& cam1,
+								Pose& cur_pose, FeaturePoints& curKF_fts_pts,
+								const cv::Mat& cur_img0, const cv::Mat& cur_img1);
 
-	Comparer* comparer;
-	std::ofstream time_ofs;
-
-	int frame_dropped_count;
-  double init_time=-1.0;
-  double cur_time;
-  bool stereo_match_flag;
-
-  PointCloud::Ptr point_cloud;
-	// shared_ptr<DirectSolver> directSolver_ptr;
-
-	void truth_Callback(const geometry_msgs::PointStamped::ConstPtr& msg);
-
-	void monoTrack(State& cur_state, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const CameraModel& cam0, const CameraModel& cam1,
-				   Frame& last_frame, std::vector<KeyFrame>& keyframes, const std::string& window_name);
-
+  // helper functions
+	KeyFrame createKeyFrame(const Pose& cur_pose, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const FeaturePoints& feature_points, const CameraModel& cam0);
+	void detectFeatures(const cv::Mat& img, std::vector<cv::KeyPoint>& kps, int fts_per_cell);
 	void triangulateByStereoMatch(KeyFrame& keyframe, const CameraModel& cam);
 
-	void detectFeatures(const cv::Mat& img, std::vector<cv::KeyPoint>& kps);
-
-	KeyFrame createKeyFrame(const Pose& cur_pose, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const FeaturePoints& feature_points, const CameraModel& cam0);
-
-	void featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::Mat& cur_img, std::vector<cv::Point2f>& cur_features);
-
-	void propagateState(State& cur_state, const cv::Mat& cur_img, Frame& last_frame, const CameraModel& cam, FeaturePoints& cur_feature_points, cv::Mat& prop_img);
-
-	bool reconstructAndOptimize(FeatureTrackingResult feature_result, const KeyFrame& lastKF,
-								const CameraModel& cam0, const CameraModel& cam1,
-								Pose& cur_pose, FeaturePoints& curKF_fts_pts, cv::Mat& proj_img,
-								const cv::Mat& cur_img0, const cv::Mat& cur_img1);
 public:
 	StereoCamera(const std::vector<double>& E0,
 			     const std::vector<double>& K0,
@@ -117,7 +119,7 @@ public:
 			     const std::vector<double>& dist_coeff1,
 			     bool cvt2VGA, const string& gt_type);
 
-	void updateConfig(direct_stereo::DirectStereoConfig &config, uint32_t level);
+	void updateConfig(dsvo::dsvoConfig &config, uint32_t level);
 
   void stereo_rectify(cv::Mat& cur_img0, cv::Mat& cur_img1);
 

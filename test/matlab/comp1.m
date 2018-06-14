@@ -21,7 +21,7 @@ i = 1;
 j = 1; % index of gt_a
 k = 1; % index of gt_a
 while i<=size(vo,1)
-    while(j<=size(gt_a,1) && vo(i,1) > gt_a(j,1))
+    while(j<=size(gt_a,1) && vo(i,1) >= gt_a(j,1))
         j = j+1;
     end
     if(j>size(gt_a,1))
@@ -40,8 +40,8 @@ vo = vo(1:length(gt),:);
 cg = mean(gt(:,2:4));
 cv = mean(vo(:,3:5));
 H = zeros(3,3);
-for i=1:length(gt)/10
-    H = H + (gt(i,2:4)-gt(1,2:4))'*(vo(i,3:5)-vo(1,3:5));
+for i=1:length(gt)
+    H = H + (gt(i,2:4)-cg)'*(vo(i,3:5)-cv);
 end
 [U,S,V] = svd(H);
 R = U*V';
@@ -49,23 +49,14 @@ for i=1:size(vo,1)
     p = R*vo(i,3:5)';
     vo(i,3:5) = p';
 end
+cg = mean(gt(:,2:4));
+cv = mean(vo(:,3:5));
 for i=size(vo,1):-1:1
-    vo(i,3:5) = vo(i,3:5) - vo(1,3:5);
+    vo(i,3:5) = vo(i,3:5) - cv;
 end
 for i=size(gt,1):-1:1
-    gt(i,2:4) = gt(i,2:4) - gt(1,2:4);
+    gt(i,2:4) = gt(i,2:4) - cg;
 end
-
-%% plot results
-% position
-gtp = gt(:,2:4);
-vop = vo(:,3:5);
-figure('Name','Trajectory')
-plot3(gtp(:,1), gtp(:,2), gtp(:,3), 'g-')
-hold on
-plot3(vop(:,1), vop(:,2), vop(:,3), 'r-')
-legend('Truth', 'Estimated');
-title('Trajectory')
 
 step = floor(length(vo) / (vo(end,1)-vo(1,1))); % step of 1 sec
 
@@ -74,6 +65,8 @@ for i=1+step:size(vo,1)
     vo(i, 6:8) = (vo(i, 3:5) - vo(i-step, 3:5));
 end
 vo = vo(1+step:end, :);
+di = vo(:,2)==0;
+si = vo(:,2)==1;
 
 % calculate gt translation
 for i=1+step:size(gt,1)
@@ -81,11 +74,25 @@ for i=1+step:size(gt,1)
 end
 gt = gt(1+step:end, :);
 
+
+%% plot results
+% position
+gtp = gt(:,2:4);
+vop_d = vo(di,3:5);
+vop_s = vo(si,3:5);
+figure('Name','Trajectory')
+plot3(gtp(:,1), gtp(:,2), gtp(:,3), 'g.')
+hold on
+plot3(vop_d(:,1), vop_d(:,2), vop_d(:,3), 'r.')
+hold on
+plot3(vop_s(:,1), vop_s(:,2), vop_s(:,3), 'b.')
+axis equal
+legend('Truth', 'Estimated');
+title('Trajectory')
+
 % velocity scale
 gtvn = vecnorm(gt(:,5:7)')';
 vovn = vecnorm(vo(:,6:8)')';
-di = vo(:,2)==0;
-si = vo(:,2)==1;
 diffn = abs(gtvn - vovn);
 diffn_d = diffn(di);
 diffn_s = diffn(si);
@@ -159,6 +166,7 @@ t_prap_dir = tt(tt(:,1)==121,2:3);  % pose propagation, direct
 t_prap_rfof = tt(tt(:,1)==122,2:3);  % pose propagation, refine by OF
 t_pts = tt(tt(:,1)==131,2:3);  % points reconstruction 
 t_scale = tt(tt(:,1)==132,2:3);  % scale opt time
+pts = tt(tt(:,4)>=0, [2,4]);
 
 fprintf('\nAve. time for [%d] stereo match = %f\n', size(t_stereo,1), mean(t_stereo(:,2)));
 fprintf('Ave. time for [%d] normal frame = %f\n', size(t_normal,1), mean(t_normal(:,2)));
@@ -169,6 +177,10 @@ fprintf('Ave. pose propagation(direct) time = %f\n', mean(t_prap_dir(:,2)));
 fprintf('Ave. pose propagation(refine by OF) time = %f\n', mean(t_prap_rfof(:,2)));
 fprintf('Ave. points reconstruction time = %f\n', mean(t_pts(:,2)));
 fprintf('Ave. scale optimization time = %f\n', mean(t_scale(:,2)));
+fprintf('Ave. # of points = %f\n', mean(pts(:,2)));
+
+% figure('Name','Points')
+% plot(pts(:,1), pts(:,2), 'b-');
 % figure('Name','VO running time')
 % plot(t_normal(:,1), t_normal(:,2), 'g*-');
 % hold on

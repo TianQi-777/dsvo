@@ -12,14 +12,16 @@
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/plot.hpp>
 #include "data.hpp"
-#include "stereo_camera/pose_edge.hpp"
+#include "stereo_camera/g2o_edges/pose_edge.hpp"
 
 class PoseEstimater {
 public:
 	double poseEstimate(const FeaturePoints& fts_pts, const cv::Mat& source_img, const cv::Mat& K, const cv::Mat& dest_img, int pymd, int iter, Eigen::Matrix3d& R, Eigen::Vector3d& t);
-private:
-	double poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, const std::vector<cv::Point2f>& fts, const cv::Mat& source_img, const cv::Mat& dest_img, const Eigen::Matrix3d& K, Eigen::Matrix3d& R, Eigen::Vector3d& t, int iter);
+	void refine_pose(const PointsWithUncertainties& points, const std::vector<cv::Point2f>& features, const cv::Mat& K, Eigen::Matrix3d& R, Eigen::Vector3d& t);
 
+private:
+	double poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, const std::vector<double>& uncertainties, const std::vector<cv::Point2f>& fts,
+													const cv::Mat& source_img, const cv::Mat& dest_img, const Eigen::Matrix3d& K, Eigen::Matrix3d& R, Eigen::Vector3d& t, int iter);
 };
 
 #endif

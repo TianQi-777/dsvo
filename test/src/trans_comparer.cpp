@@ -1,4 +1,4 @@
-#include "comparers/trans_comparer.hpp"
+#include "trans_comparer.hpp"
 
 TransComparer::TransComparer() {
 	gt_sub = nh.subscribe("/vicon/firefly_sbx/firefly_sbx", 1000, &TransComparer::gt_Callback, this);
