@@ -1,5 +1,5 @@
-#ifndef STEREO_CAMERA_HPP
-#define STEREO_CAMERA_HPP
+#ifndef STEREO_PROCESSOR_HPP
+#define STEREO_PROCESSOR_HPP
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -12,6 +12,7 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/plot.hpp>
+#include <cv_bridge/cv_bridge.h>
 #include <dynamic_reconfigure/server.h>
 #include <pcl_ros/point_cloud.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -25,6 +26,7 @@
 #include "helper.hpp"
 #include "pose_estimater.hpp"
 #include "reconstructor.hpp"
+#include "klt.hpp"
 #include "scale_optimizer.hpp"
 #include "local_KF_optimizer.hpp"
 #include "comparer.hpp"
@@ -32,11 +34,13 @@
 #include "point_comparer.hpp"
 #include "trans_comparer.hpp"
 
-typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
+typedef pcl::PointCloud<pcl::PointXYZI> PointCloud;
 
-class StereoCamera
+class StereoProcessor
 {
 private:
+	State state;
+
 	// parameters
   int OF_size = 11;       // optical flow size
 	float MAX_VEL = 3;      // max pose propagation velocity
@@ -65,9 +69,13 @@ private:
 
   // ros modules
 	ros::NodeHandle nh;
+	message_filters::Subscriber<sensor_msgs::Image> *cam0_sub;
+	message_filters::Subscriber<sensor_msgs::Image> *cam1_sub;
+	message_filters::Synchronizer<StereoSyncPolicy> *sync;
 	ros::Publisher pcl_pub;
 	dynamic_reconfigure::Server<dsvo::dsvoConfig> server;
 	dynamic_reconfigure::Server<dsvo::dsvoConfig>::CallbackType f;
+	void imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, const sensor_msgs::ImageConstPtr& img1_cptr);
 
   // stereo components
 	CameraModel camera0;
@@ -94,36 +102,28 @@ private:
 	PoseEstimater pose_estimater;
 	Reconstructor reconstructor;
 	ScaleOptimizer scale_optimizer;
+	KLT klt;
 	LocalKFOptimizer local_KF_optimizer;
-	void monoTrack(State& cur_state, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const CameraModel& cam0, const CameraModel& cam1, Frame& last_frame, std::vector<KeyFrame>& keyframes, const std::string& window_name);
- 	bool propagateState(State& cur_state, const cv::Mat& cur_img, KeyFrame& lastKF, Frame& last_frame, const CameraModel& cam, FeaturePoints& cur_feature_points);
+	void track(const cv::Mat& _cur_img0, const cv::Mat& _cur_img1, double _cur_time);
+	void monoTrack(const cv::Mat& cur_img0, const cv::Mat& cur_img1, const CameraModel& cam0, const CameraModel& cam1, Frame& last_frame, std::vector<KeyFrame>& keyframes, const std::string& window_name);
+ 	bool propagateState(const cv::Mat& cur_img, KeyFrame& lastKF, Frame& last_frame, const CameraModel& cam, FeaturePoints& cur_feature_points);
  	void featureTrack(KeyFrame& lastKF, Frame& last_frame, const cv::Mat& cur_img, std::vector<cv::Point2f>& cur_features);
 	bool reconstructAndOptimize(KFData& kf_data, const KeyFrame& lastKF,
 								const CameraModel& cam0, const CameraModel& cam1,
-								Pose& cur_pose, FeaturePoints& curKF_fts_pts,
+								Pose& cur_pose, FeaturePoints& curKF_fts_pts, std::vector<bool>& curKF_new_pts_flags,
 								const cv::Mat& cur_img0, const cv::Mat& cur_img1);
 
   // helper functions
-	KeyFrame createKeyFrame(const Pose& cur_pose, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const FeaturePoints& feature_points, const CameraModel& cam0);
+	KeyFrame createKeyFrame(const Pose& cur_pose, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const CameraModel& cam0,
+													const FeaturePoints& feature_points=FeaturePoints(), const std::vector<bool>& new_pts_flags=std::vector<bool>());
 	void detectFeatures(const cv::Mat& img, std::vector<cv::KeyPoint>& kps, int fts_per_cell);
 	void triangulateByStereoMatch(KeyFrame& keyframe, const CameraModel& cam);
 
 public:
-	StereoCamera(const std::vector<double>& E0,
-			     const std::vector<double>& K0,
-			     const std::vector<double>& frame_size0,
-			     const std::vector<double>& dist_coeff0,
-			     const std::vector<double>& E1,
-			     const std::vector<double>& K1,
-			     const std::vector<double>& frame_size1,
-			     const std::vector<double>& dist_coeff1,
-			     bool cvt2VGA, const string& gt_type);
+	StereoProcessor();
 
 	void updateConfig(dsvo::dsvoConfig &config, uint32_t level);
 
-  void stereo_rectify(cv::Mat& cur_img0, cv::Mat& cur_img1);
-
-	void track(State& cur_state, const cv::Mat& _cur_img0, const cv::Mat& _cur_img1, double _cur_time);
 };
 
 #endif

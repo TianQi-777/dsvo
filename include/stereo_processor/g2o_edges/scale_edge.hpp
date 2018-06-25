@@ -3,7 +3,7 @@
 #include <Eigen/Geometry>
 #include <iostream>
 
-#include "../data.hpp"
+#include "data.hpp"
 #include "../helper.hpp"
 
 #include "g2o/core/sparse_optimizer.h"
@@ -51,7 +51,7 @@ class VertexScale : public g2o::BaseVertex<1, double>
     }
 };
 
-class EdgeScaleDirect : public g2o::BaseUnaryEdge<1, ScaleBatch, VertexScale>
+class EdgeScaleDirect : public g2o::BaseUnaryEdge<1, Eigen::VectorXd, VertexScale>
 {
   public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW

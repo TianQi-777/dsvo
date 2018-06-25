@@ -29,30 +29,38 @@ catkin_package()
 
 include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS} include test/include)
 
-add_executable(manager_node
-  src/stereo_camera/g2o_edges/scale_edge.cpp
-  src/stereo_camera/g2o_edges/pose_edge.cpp
-  src/stereo_camera/g2o_edges/edge_se3m.cpp
+add_executable(stereo_rectifier_node
+  src/stereo_rectifier_node.cpp
+  src/stereo_rectifier.cpp
+)
+
+target_link_libraries(stereo_rectifier_node
+	${catkin_LIBRARIES}
+	${OpenCV_LIBS}
+)
+
+add_executable(stereo_processor_node
+  src/stereo_processor/g2o_edges/scale_edge.cpp
+  src/stereo_processor/g2o_edges/pose_edge.cpp
+  src/stereo_processor/g2o_edges/klt_edge.cpp
+  src/stereo_processor/g2o_edges/edge_se3m.cpp
   test/src/odom_comparer.cpp
   test/src/point_comparer.cpp
   test/src/trans_comparer.cpp
   test/src/comparer.cpp
-  src/manager_node.cpp
-  src/manager.cpp
   src/state.cpp
-  src/stereo_camera/stereo_camera.cpp
-  src/stereo_camera/stereo_camera_helpers.cpp
-  src/stereo_camera/reconstructor.cpp
-  src/stereo_camera/scale_optimizer.cpp
-  src/stereo_camera/local_KF_optimizer.cpp
-  src/stereo_camera/pose_estimater.cpp)
+  src/stereo_processor/stereo_processor.cpp
+  src/stereo_processor/stereo_processor_helpers.cpp
+  src/stereo_processor/stereo_processor_node.cpp
+  src/stereo_processor/reconstructor.cpp
+  src/stereo_processor/scale_optimizer.cpp
+  src/stereo_processor/klt.cpp
+  src/stereo_processor/local_KF_optimizer.cpp
+  src/stereo_processor/pose_estimater.cpp)
 
-add_executable(zed_split src/tools/zed_split.cpp)
-add_executable(kitti_pub src/tools/kitti_pub.cpp)
+add_dependencies(stereo_processor_node ${PROJECT_NAME}_gencfg)
 
-add_dependencies(manager_node ${PROJECT_NAME}_gencfg)
-
-target_link_libraries(manager_node
+target_link_libraries(stereo_processor_node
 	${catkin_LIBRARIES}
 	${OpenCV_LIBS}
   ${CSPARSE_LIBRARY}
@@ -60,11 +68,14 @@ target_link_libraries(manager_node
   g2o_core g2o_types_slam3d g2o_solver_csparse csparse g2o_stuff g2o_csparse_extension g2o_types_sba cholmod
 )
 
+add_executable(zed_split src/tools/zed_split.cpp)
 
 target_link_libraries(zed_split
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
 )
+
+add_executable(kitti_pub src/tools/kitti_pub.cpp)
 
 target_link_libraries(kitti_pub
   ${catkin_LIBRARIES}

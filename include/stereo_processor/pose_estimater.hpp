@@ -12,7 +12,7 @@
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/plot.hpp>
 #include "data.hpp"
-#include "stereo_camera/g2o_edges/pose_edge.hpp"
+#include "stereo_processor/g2o_edges/pose_edge.hpp"
 
 class PoseEstimater {
 public:

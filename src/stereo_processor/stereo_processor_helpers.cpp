@@ -1,6 +1,6 @@
-#include "stereo_camera/stereo_camera.hpp"
+#include "stereo_processor/stereo_processor.hpp"
 
-void StereoCamera::updateConfig(dsvo::dsvoConfig &config, uint32_t level) {
+void StereoProcessor::updateConfig(dsvo::dsvoConfig &config, uint32_t level) {
 	BLUR_SZ = 2*config.BLUR_SZ+1;
 	BLUR_VAR = config.BLUR_VAR;
 	FEATURE_BLOCKS = config.FEATURE_BLOCKS;
@@ -33,15 +33,25 @@ void StereoCamera::updateConfig(dsvo::dsvoConfig &config, uint32_t level) {
   param_changed = true;
 }
 
-StereoCamera::StereoCamera(const std::vector<double>& E0,
-						   const std::vector<double>& K0,
-						   const std::vector<double>& frame_size0,
-						   const std::vector<double>& dist_coeff0,
-						   const std::vector<double>& E1,
-						   const std::vector<double>& K1,
-						   const std::vector<double>& frame_size1,
-						   const std::vector<double>& dist_coeff1,
-						   bool cvt2VGA, const string& gt_type) {
+StereoProcessor::StereoProcessor() {
+	ros::NodeHandle nhPriv("~");
+	std::vector<double> E0, K0, frame_size0, dist_coeff0;
+	std::vector<double> E1, K1, frame_size1, dist_coeff1;
+	// cameras model
+	if(!nhPriv.getParam("/cam0/T_BS/data", E0)
+	|| !nhPriv.getParam("/cam0/intrinsics", K0)
+	|| !nhPriv.getParam("/cam0/resolution", frame_size0)
+	|| !nhPriv.getParam("/cam0/distortion_coefficients", dist_coeff0)
+	|| !nhPriv.getParam("/cam1/T_BS/data", E1)
+	|| !nhPriv.getParam("/cam1/intrinsics", K1)
+	|| !nhPriv.getParam("/cam1/resolution", frame_size1)
+	|| !nhPriv.getParam("/cam1/distortion_coefficients", dist_coeff1)
+	  )
+	{
+		ROS_INFO("Fail to get cameras parameters, exit.");
+	      return;
+	}
+
 	// cam0
 	cv::Mat cam0_E = cv::Mat(E0);
 	cam0_E = cam0_E.reshape(0,4);
@@ -75,11 +85,11 @@ StereoCamera::StereoCamera(const std::vector<double>& E0,
 	stereo0.R = R1T * R0;
 	stereo0.t = R1T * (t0 - t1);
 	cv::Size frame_size = cam0_frame_size;
+	bool cvt2VGA = false;
+	nhPriv.getParam("cvt2VGA", cvt2VGA);
   if(cvt2VGA) frame_size = cv::Size(640,480);
   cv::Mat rect_R0, rect_R1, rect_P0, rect_P1, Q;
   cv::stereoRectify(camera0.K, dist_coeff0, camera1.K, dist_coeff1,cam0_frame_size, stereo0.R, stereo0.t, rect_R0, rect_R1, rect_P0, rect_P1, Q, cv::CALIB_ZERO_DISPARITY, 0, frame_size);
-  cv::initUndistortRectifyMap(camera0.K, dist_coeff0, rect_R0, rect_P0, frame_size,CV_32F, camera0.rect_map_x, camera0.rect_map_y);
-  cv::initUndistortRectifyMap(camera1.K, dist_coeff1, rect_R1, rect_P1, frame_size, CV_32F, camera1.rect_map_x, camera1.rect_map_y);
 
   // modify external matrix by rect rotation
 	cv::Mat rR0T, rR1T;
@@ -118,7 +128,9 @@ StereoCamera::StereoCamera(const std::vector<double>& E0,
 	camera0.stereo = stereo1;
 	/***********************stereo rectify end***********************/
 
-	// comparer type
+	// ground truth type
+	string gt_type = "";
+	nhPriv.getParam("gt_type", gt_type);
 	if(gt_type == "odom")
 	{
 		comparer = new OdomComparer();
@@ -128,21 +140,43 @@ StereoCamera::StereoCamera(const std::vector<double>& E0,
 		comparer = new TransComparer();
 	}
 
+	// subscribe to rect_img topics
+	cam0_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, RECT_IMG0_TOPIC, 1000);
+	cam1_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, RECT_IMG1_TOPIC, 1000);
+
+	sync = new message_filters::Synchronizer<StereoSyncPolicy>(StereoSyncPolicy(10), *cam0_sub, *cam1_sub);
+	sync->registerCallback(boost::bind(&StereoProcessor::imageMessageCallback, this, _1, _2));
+
 	pcl_pub = nh.advertise<PointCloud> ("points", 1);
 	point_cloud = PointCloud::Ptr(new PointCloud);
 
-	f = boost::bind(&StereoCamera::updateConfig, this, _1, _2);
+	f = boost::bind(&StereoProcessor::updateConfig, this, _1, _2);
   	server.setCallback(f);
 
   param_changed = true;
 }
 
-void StereoCamera::stereo_rectify(cv::Mat& cur_img0, cv::Mat& cur_img1) {
-	cv::remap(cur_img0, cur_img0, camera0.rect_map_x, camera0.rect_map_y, cv::INTER_LINEAR);
-	cv::remap(cur_img1, cur_img1, camera1.rect_map_x, camera1.rect_map_y, cv::INTER_LINEAR);
+void StereoProcessor::imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, const sensor_msgs::ImageConstPtr& img1_cptr) {
+	cv_bridge::CvImageConstPtr img0_ptr, img1_ptr;
+	try
+	{
+		img0_ptr = cv_bridge::toCvShare(img0_cptr, sensor_msgs::image_encodings::MONO8);
+		img1_ptr = cv_bridge::toCvShare(img1_cptr, sensor_msgs::image_encodings::MONO8);
+	}
+	catch (cv_bridge::Exception& e)
+	{
+		ROS_ERROR("cv_bridge exception: %s", e.what());
+		return;
+	}
+
+	cv::Mat img0, img1;
+	img0_ptr->image.copyTo(img0);
+	img1_ptr->image.copyTo(img1);
+
+	track(img0, img1, img0_cptr->header.stamp.toSec());
 }
 
-void StereoCamera::detectFeatures(const cv::Mat& img, std::vector<cv::KeyPoint>& kps, int fts_per_cell) {
+void StereoProcessor::detectFeatures(const cv::Mat& img, std::vector<cv::KeyPoint>& kps, int fts_per_cell) {
 	static cv::Ptr<cv::FastFeatureDetector> detector = cv::FastFeatureDetector::create(FEATURE_THRES);
 
 	int subCols = img.cols / FEATURE_BLOCKS;
@@ -173,7 +207,7 @@ void StereoCamera::detectFeatures(const cv::Mat& img, std::vector<cv::KeyPoint>&
   }
 }
 
-void StereoCamera::triangulateByStereoMatch(KeyFrame& keyframe, const CameraModel& cam) {
+void StereoProcessor::triangulateByStereoMatch(KeyFrame& keyframe, const CameraModel& cam) {
 	float MAX_DISP = 50.0;
 	std::clock_t triangulateByStereoMatch_start = std::clock();
 	// find stereo match by row matching
@@ -225,6 +259,8 @@ void StereoCamera::triangulateByStereoMatch(KeyFrame& keyframe, const CameraMode
 		kp1_in.push_back(kp1[match_candidates[0].trainIdx].pt);
   }
 
+	if(kp0_in.empty()) return;
+
   if(DEBUG) {
 	  cv::Mat match_img;
 	  cv::drawMatches(keyframe.img0, kp0, keyframe.img1, kp1, matches, match_img);
@@ -258,59 +294,59 @@ void StereoCamera::triangulateByStereoMatch(KeyFrame& keyframe, const CameraMode
 	// std::cout << "triangulateByStereoMatch: " << (std::clock() - triangulateByStereoMatch_start) / (double)(CLOCKS_PER_SEC / 1000) << " ms" << std::endl;
 }
 
-KeyFrame StereoCamera::createKeyFrame(const Pose& cur_pose, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const FeaturePoints& feature_points, const CameraModel& cam0){
+KeyFrame StereoProcessor::createKeyFrame(const Pose& cur_pose, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const CameraModel& cam0,
+												                 const FeaturePoints& feature_points, const std::vector<bool>& new_pts_flags){
 	KeyFrame keyframe = KeyFrame();
 	keyframe.pose = cur_pose;
 	keyframe.time = cur_time;
 	keyframe.img0 = cur_img0.clone();
 	keyframe.img1 = cur_img1.clone();
-	if(feature_points.features.empty()) { // use stereo match to triangulate points if necessary
+	if(feature_points.empty()) { // use stereo match to triangulate points if necessary
 		if(DEBUG) std::cout<<"triangulateByStereoMatch"<<std::endl;
 		triangulateByStereoMatch(keyframe, cam0);
 	} else {
 	  keyframe.feature_points = feature_points;
 	}
-	keyframe.feature_points_init_count = keyframe.feature_points.points.size();
+	keyframe.feature_points_init_count = keyframe.feature_points.size();
 
   // detect new feature points
   std::vector<cv::KeyPoint> kp0;
-	for(int i=0; i<feature_points.features.size(); i++) {
-		kp0.push_back(cv::KeyPoint(feature_points.features[i], 1.0));
+	for(int i=0; i<feature_points.size(); i++) {
+		kp0.push_back(cv::KeyPoint(feature_points[i].feature, 1.0));
 	}
 	detectFeatures(keyframe.img0, kp0, FEATURES_PER_CELL);
 	for(int i=0; i<kp0.size(); i++) {
 		keyframe.new_features.push_back(kp0[i].pt);
 	}
 
-	// publish point cloud in world coordinate
+	// publish stereo match point cloud in world coordinate
 	Eigen::Matrix3d _R = cur_pose.orientation.toRotationMatrix()*cam0.R_C2B;
 	Eigen::Vector3d _t = cur_pose.orientation.toRotationMatrix()*cam0.t_C2B+cur_pose.position;
 	cv::Mat R, t;
 	cv::eigen2cv(_R, R);
 	cv::eigen2cv(_t, t);
-	if(DEBUG) point_cloud->clear();
-	int red(0), blue(255);
-	if(feature_points.features.empty()) {
-		red = 255; blue = 0;
-	}
-	for(int i=0; i<keyframe.feature_points.points.size(); i++) {
-		cv::Mat pts_cur = cv::Mat(keyframe.feature_points.points[i]);
+	bool dsvo_flag = !new_pts_flags.empty();
+	for(int i=0; i<keyframe.feature_points.size(); i++) {
+		if(dsvo_flag && !new_pts_flags[i]) continue;
+		cv::Mat pts_cur = cv::Mat(keyframe.feature_points[i].point.point);
 		pts_cur.convertTo(pts_cur, CV_64F);
 		cv::Mat pts_w = R*pts_cur + t;
 
-		pcl::PointXYZRGB p;
+		pcl::PointXYZI p;
 		p.x = pts_w.at<double>(0);
 		p.y = pts_w.at<double>(1);
 		p.z = pts_w.at<double>(2);
-		p.r = red;
-		p.b = blue;
+		p.intensity = keyframe.img0.at<uchar>(keyframe.feature_points[i].feature.y, keyframe.feature_points[i].feature.x);
 		point_cloud->push_back(p);
+
+		// keyframe.feature_points[i].published = true;
 	}
 	point_cloud->header.frame_id = "/map";
 	pcl_pub.publish(point_cloud);
 
   if(DEBUG)
 	{
+		std::cout<<"# of new points: "<<point_cloud->size()<<" / "<<keyframe.feature_points.size()<<std::endl;
 	  cv::Mat feature_img = keyframe.img0.clone();
 	  cv::cvtColor(feature_img, feature_img, cv::COLOR_GRAY2BGR);
 	  for(int i=0; i<keyframe.new_features.size(); i++) {

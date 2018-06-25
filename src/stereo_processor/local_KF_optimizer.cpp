@@ -1,4 +1,4 @@
-#include "stereo_camera/local_KF_optimizer.hpp"
+#include "stereo_processor/local_KF_optimizer.hpp"
 
 void projAndDrawPts(const std::vector<cv::Point3f>& points, const cv::Mat& img, const cv::Mat& K, const Eigen::Matrix3d& R_cur2KF, const Eigen::Vector3d& t_cur2KF, const std::string& window_name) {
 	cv::Mat proj_img = img.clone();
@@ -78,7 +78,7 @@ bool LocalKFOptimizer::optimize(std::vector<KeyFrame>& keyframes, int KF_count, 
     optimizer.initializeOptimization();
     // optimizer.save("/home/jiawei/Desktop/result_before.g2o");
     // cv::waitKey();
-    optimizer.optimize( 10 ); 
+    optimizer.optimize( 10 );
     // optimizer.save( "/home/jiawei/Desktop/result_after.g2o" );
 
 	// write back to KFs
@@ -98,10 +98,10 @@ bool LocalKFOptimizer::optimize(std::vector<KeyFrame>& keyframes, int KF_count, 
 }
 
 double LocalKFOptimizer::getTransformBetweenKF(const KeyFrame& KF_from, const KeyFrame& KF_to, const CameraModel& cam0, Eigen::Isometry3d& T) {
-	if(KF_from.feature_points.points.size() < 10) return false; //too few points
+	if(KF_from.feature_points.size() < 10) return false; //too few points
 
 	Eigen::Matrix3d R_from2to = cam0.R_B2C * KF_to.pose.orientation.toRotationMatrix().transpose() * KF_from.pose.orientation.toRotationMatrix() * cam0.R_C2B;
-	Eigen::Vector3d t_from2to = cam0.R_B2C * KF_to.pose.orientation.toRotationMatrix().transpose() 
+	Eigen::Vector3d t_from2to = cam0.R_B2C * KF_to.pose.orientation.toRotationMatrix().transpose()
 							 * (KF_from.pose.orientation.toRotationMatrix() * cam0.t_C2B
 							 -  KF_to.pose.orientation.toRotationMatrix() * cam0.t_C2B
 							 +  KF_from.pose.position - KF_to.pose.position);
@@ -116,8 +116,8 @@ double LocalKFOptimizer::getTransformBetweenKF(const KeyFrame& KF_from, const Ke
 	Eigen::AngleAxisd angle(R);
 	T = Eigen::Isometry3d::Identity();
 	T =  angle;
-    T(0,3) = t(0); 
-    T(1,3) = t(1); 
+    T(0,3) = t(0);
+    T(1,3) = t(1);
     T(2,3) = t(2);
 
 	return dist;

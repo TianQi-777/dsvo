@@ -13,7 +13,7 @@
 
 #include "data.hpp"
 #include "helper.hpp"
-#include "stereo_camera/g2o_edges/scale_edge.hpp"
+#include "stereo_processor/g2o_edges/scale_edge.hpp"
 
 class ScaleOptimizer{
 public:

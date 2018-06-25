@@ -1,4 +1,4 @@
-#include "stereo_camera/reconstructor.hpp"
+#include "stereo_processor/reconstructor.hpp"
 
 void Reconstructor::reconstructAndBundleAdjust(KFData& kf_data,	const cv::Mat& K, int max_opt_step, double max_reproj_dist) {
 
@@ -44,15 +44,15 @@ void Reconstructor::reconstructAndBundleAdjust(KFData& kf_data,	const cv::Mat& K
 
   // initialize PointXYZ
   std::vector<g2o::EdgeProjectXYZ2UV*> edge0s, edge1s;
-  for ( size_t i=0; i<kf_data.points.size(); i++ )
+  for ( size_t i=0; i<kf_data.size(); i++ )
   {
 		double z = 1;
 		double x = ( kf_data.lastKF_features[i].x - cx ) * z / fx;
 		double y = ( kf_data.lastKF_features[i].y - cy ) * z / fy;
-		if(kf_data.points.uncertainties[i]<kf_data.MAX_UNCERTAINTY){
-			x = kf_data.points.points[i].x;
-			y = kf_data.points.points[i].y;
-			z = kf_data.points.points[i].z;
+		if(!kf_data.new_pts_flags[i]){
+			x = kf_data.points[i].point.x;
+			y = kf_data.points[i].point.y;
+			z = kf_data.points[i].point.z;
 		}
 
     // add triangulated point
@@ -67,7 +67,7 @@ void Reconstructor::reconstructAndBundleAdjust(KFData& kf_data,	const cv::Mat& K
     edge0->setVertex( 0, dynamic_cast<g2o::VertexSBAPointXYZ*>   (v) );
     edge0->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (v0) );
     edge0->setMeasurement( Eigen::Vector2d(kf_data.lastKF_features[i].x, kf_data.lastKF_features[i].y ) );
-		edge0->setInformation( (1.0/kf_data.points.uncertainties[i])*Eigen::Matrix2d::Identity() );
+		edge0->setInformation( (1.0/kf_data.points[i].uncertainty)*Eigen::Matrix2d::Identity() );
     // edge0->setInformation( Eigen::Matrix2d::Identity() );
     edge0->setParameterId(0, 0);
     edge0->setRobustKernel( new g2o::RobustKernelHuber() );
@@ -79,7 +79,7 @@ void Reconstructor::reconstructAndBundleAdjust(KFData& kf_data,	const cv::Mat& K
     edge1->setVertex( 0, dynamic_cast<g2o::VertexSBAPointXYZ*>   (v) );
     edge1->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (v1) );
     edge1->setMeasurement( Eigen::Vector2d(kf_data.cur_features[i].x, kf_data.cur_features[i].y ) );
-		edge1->setInformation( (1.0/kf_data.points.uncertainties[i])*Eigen::Matrix2d::Identity() );
+		edge1->setInformation( (1.0/kf_data.points[i].uncertainty)*Eigen::Matrix2d::Identity() );
     // edge1->setInformation( Eigen::Matrix2d::Identity() );
     edge1->setParameterId(0,0);
     edge1->setRobustKernel( new g2o::RobustKernelHuber() );
@@ -104,7 +104,7 @@ void Reconstructor::reconstructAndBundleAdjust(KFData& kf_data,	const cv::Mat& K
   cv::eigen2cv(t_eigen, kf_data.t_lastKF2Cur);
 
 	std::vector<cv::Point3d> _pts;
-  for ( size_t i=0; i<edge0s.size(); i++ )
+  for ( size_t i=0; i<kf_data.points.size(); i++ )
   {
       g2o::VertexSBAPointXYZ* v = dynamic_cast<g2o::VertexSBAPointXYZ*> (optimizer.vertex(i+2));
       Eigen::Vector3d pos = v->estimate() / t_norm;
@@ -113,9 +113,11 @@ void Reconstructor::reconstructAndBundleAdjust(KFData& kf_data,	const cv::Mat& K
 
 	// remove outlier by reproject to left img
 	std::vector<cv::Point2f> _features0(kf_data.lastKF_features), _features1(kf_data.cur_features);
+	std::vector<bool> _new_pts_flags(kf_data.new_pts_flags);
 	kf_data.lastKF_features.clear();
 	kf_data.cur_features.clear();
 	kf_data.points.clear();
+	kf_data.new_pts_flags.clear();
   std::vector<cv::Point2d> proj_pts0, proj_pts1;
 	cv::Mat rVec;
   cv::Rodrigues(kf_data.R_lastKF2Cur, rVec);
@@ -135,6 +137,7 @@ void Reconstructor::reconstructAndBundleAdjust(KFData& kf_data,	const cv::Mat& K
 		kf_data.lastKF_features.push_back(_features0[i]);
 		kf_data.cur_features.push_back(_features1[i]);
 		kf_data.points.push_back(_pts[i], cv::norm(_features0[i]-cv::Point2f(u0,v0)) + cv::norm(_features1[i]-cv::Point2f(u1,v1)));
+		kf_data.new_pts_flags.push_back(_new_pts_flags[i]);
 	}
 }
 

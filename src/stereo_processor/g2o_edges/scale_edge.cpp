@@ -1,4 +1,4 @@
-#include "stereo_camera/g2o_edges/scale_edge.hpp"
+#include "stereo_processor/g2o_edges/scale_edge.hpp"
 #include <g2o/core/factory.h>
 
 #include <iostream>
@@ -32,10 +32,10 @@ void EdgeScaleDirect::computeError()
 		return;
 	}
 
-	ScaleBatch batch;
+	Eigen::VectorXd batch;
 	helper::getBatchAround(img1,u,v,batch);
 	// cout<<"batch= "<<batch<<endl<<" _measurement= "<<_measurement<<endl;
-	_error(0,0) = (batch - _measurement).sum() / BATCH_SIZE / BATCH_SIZE;
+	_error = batch - _measurement;
 	// _error(0,0) = (batch - _measurement).sum() / BATCH_SIZE / BATCH_SIZE + 1.0 / scale_inv / scale_inv;
 	// cout<<"error "<<_error(0)<<endl;
 

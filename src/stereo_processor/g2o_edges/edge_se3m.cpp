@@ -24,7 +24,7 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "stereo_camera/g2o_edges/edge_se3m.h"
+#include "stereo_processor/g2o_edges/edge_se3m.h"
 #include "/home/jiawei/workspace/g2o/g2o/types/slam3d/isometry3d_gradients.h"
 #include <iostream>
 

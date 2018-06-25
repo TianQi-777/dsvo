@@ -1,4 +1,4 @@
-#include "stereo_camera/pose_estimater.hpp"
+#include "stereo_processor/pose_estimater.hpp"
 bool DEBUG_POSE = false;
 
 double PoseEstimater::poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, const std::vector<double>& uncertainties, const std::vector<cv::Point2f>& fts,
@@ -20,7 +20,7 @@ double PoseEstimater::poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, 
 	for(int i=0; i<fts.size(); i++) {
 		PoseEdge* edge = new PoseEdge(pts[i], K, dest_img);
 		edge->setVertex(0, pose);
-		ScaleBatch batch;
+		Eigen::VectorXd batch;
 		helper::getBatchAround(source_img,fts[i].x,fts[i].y,batch);
 		edge->setMeasurement(batch);
 		edge->setInformation(Eigen::Matrix<double,1,1>::Identity());
@@ -44,9 +44,9 @@ double PoseEstimater::poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, 
 double PoseEstimater::poseEstimate(const FeaturePoints& fts_pts, const cv::Mat& source_img, const cv::Mat& K, const cv::Mat& dest_img, int pymd, int iter, Eigen::Matrix3d& R, Eigen::Vector3d& t){
 	//TODO: multi-thread
 	std::vector<Eigen::Vector3d> pts_eigen;
-	for(int i=0; i<fts_pts.points.size(); i++) {
+	for(int i=0; i<fts_pts.size(); i++) {
 		Eigen::Vector3d tmp;
-		tmp << fts_pts.points[i].x, fts_pts.points[i].y, fts_pts.points[i].z;
+		tmp << fts_pts[i].point.point.x, fts_pts[i].point.point.y, fts_pts[i].point.point.z;
 		pts_eigen.push_back(tmp);
 	}
 
@@ -72,8 +72,8 @@ double PoseEstimater::poseEstimate(const FeaturePoints& fts_pts, const cv::Mat& 
 		K_pymd.push_back(K_eigen);
 
 		std::vector<cv::Point2f> fts_tmp;
-		for(int i=0; i<fts_pts.features.size(); i++) {
-			fts_tmp.push_back(cv::Point2f(fts_pts.features[i].x/pymd_scale, fts_pts.features[i].y/pymd_scale));
+		for(int i=0; i<fts_pts.size(); i++) {
+			fts_tmp.push_back(cv::Point2f(fts_pts[i].feature.x/pymd_scale, fts_pts[i].feature.y/pymd_scale));
 		}
 		fts_pymd.push_back(fts_tmp);
 
@@ -86,16 +86,16 @@ double PoseEstimater::poseEstimate(const FeaturePoints& fts_pts, const cv::Mat& 
 		if(DEBUG_POSE)
 		{
 			cv::Mat proj_img = dest_img.clone();
-			helper::project3DPtsToImg(fts_pts.points, K, R, t, proj_img);
+			helper::project3DPtsToImg(fts_pts.points(), K, R, t, proj_img);
 			cv::imshow("Pose projection"+std::to_string(i), proj_img);
 			cv::waitKey(1);
 		}
-		dist = poseEstimatePymd(pts_eigen, fts_pts.uncertainties, fts_pymd[i], source_img_pymd[i], dest_img_pymd[i], K_pymd[i], R, t, iter);
+		dist = poseEstimatePymd(pts_eigen, fts_pts.uncertainties(), fts_pymd[i], source_img_pymd[i], dest_img_pymd[i], K_pymd[i], R, t, iter);
 	}
 		if(DEBUG_POSE)
 		{
 			cv::Mat proj_img = dest_img.clone();
-			helper::project3DPtsToImg(fts_pts.points, K, R, t, proj_img);
+			helper::project3DPtsToImg(fts_pts.points(), K, R, t, proj_img);
 			cv::imshow("Pose projection"+std::to_string(0), proj_img);
 			cv::waitKey(1);
 		}
@@ -138,7 +138,7 @@ void PoseEstimater::refine_pose(const PointsWithUncertainties& points, const std
       v_points->setId( 1 + i );
 			v_points->setFixed( true );
       v_points->setMarginalized(true);
-      v_points->setEstimate(Eigen::Vector3d(points.points[i].x,points.points[i].y,points.points[i].z));
+      v_points->setEstimate(Eigen::Vector3d(points[i].point.x,points[i].point.y,points[i].point.z));
       optimizer.addVertex( v_points );
 
       // project to features
@@ -147,7 +147,7 @@ void PoseEstimater::refine_pose(const PointsWithUncertainties& points, const std
       edge->setVertex( 1, dynamic_cast<g2o::VertexSE3Expmap*>     (v_pose)   );
       edge->setMeasurement( Eigen::Vector2d(features[i].x, features[i].y ) );
 			// edge->setInformation(  Eigen::Matrix2d::Identity() );
-      edge->setInformation( 1/points.uncertainties[i] * Eigen::Matrix2d::Identity() );
+      edge->setInformation( 1/points[i].uncertainty * Eigen::Matrix2d::Identity() );
       edge->setParameterId(0, 0);
       edge->setRobustKernel( new g2o::RobustKernelHuber() );
       optimizer.addEdge( edge );

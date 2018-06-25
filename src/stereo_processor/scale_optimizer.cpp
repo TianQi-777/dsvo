@@ -1,13 +1,13 @@
-#include "stereo_camera/scale_optimizer.hpp"
+#include "stereo_processor/scale_optimizer.hpp"
 bool DEBUG_SCALE = false;
 
 double ScaleOptimizer::optimize(const std::vector<cv::Point2f>& fts, const PointsWithUncertainties& pts, double& scale,
 						 const CameraModel& cam1, const cv::Mat& img0, const cv::Mat& img1, int pymd, int max_opt_step)
 {
 	std::vector<Eigen::Vector3d> pts_eigen;
-	for(int i=0; i<pts.points.size(); i++) {
+	for(int i=0; i<pts.size(); i++) {
 		Eigen::Vector3d tmp;
-		tmp << pts.points[i].x, pts.points[i].y, pts.points[i].z;
+		tmp << pts[i].point.x, pts[i].point.y, pts[i].point.z;
 		pts_eigen.push_back(tmp);
 	}
 
@@ -47,18 +47,18 @@ double ScaleOptimizer::optimize(const std::vector<cv::Point2f>& fts, const Point
 		if(DEBUG_SCALE) {
 			std::cout<<"current scale = "<<scale<<std::endl;
 			cv::Mat proj_img = img1.clone();
-			helper::project3DPtsToImg(pts.points, scale, cam1,proj_img);
+			helper::project3DPtsToImg(pts.points(), scale, cam1,proj_img);
 			cv::imshow("Scale projection", proj_img);
 			cv::waitKey();
 		}
-		err = optimize_pymd(fts_pymd[i], pts_eigen, pts.uncertainties, scale, img0_pymd[i], img1_pymd[i], cam1.stereo.t.at<double>(0,0), K1_pymd[i], max_opt_step);
+		err = optimize_pymd(fts_pymd[i], pts_eigen, pts.uncertainties(), scale, img0_pymd[i], img1_pymd[i], cam1.stereo.t.at<double>(0,0), K1_pymd[i], max_opt_step);
 	}
 
 	if(DEBUG_SCALE)
 	{
 		std::cout<<"current scale = "<<scale<<std::endl;
 		cv::Mat proj_img = img1.clone();
-		helper::project3DPtsToImg(pts.points, scale, cam1,proj_img);
+		helper::project3DPtsToImg(pts.points(), scale, cam1,proj_img);
 		cv::imshow("Scale projection", proj_img);
 		cv::waitKey();
 	}
@@ -90,7 +90,7 @@ double ScaleOptimizer::optimize_pymd(const std::vector<cv::Point2f>& fts, const 
 	for(int i=0; i<pts.size(); i++) {
 		EdgeScaleDirect* e = new EdgeScaleDirect(pts[i], K1, tx, img1);
 		e->setVertex(0, v);
-		ScaleBatch batch;
+		Eigen::VectorXd batch;
 		helper::getBatchAround(img0, fts[i].x, fts[i].y, batch);
 		e->setMeasurement(batch);
 		// e->setInformation(Eigen::Matrix<double,1,1>::Identity());

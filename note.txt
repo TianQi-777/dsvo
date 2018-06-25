@@ -1,4 +1,6 @@
 Tasks:
+  zed ground truth
+
   mh.yaml for grass
 
   optimize optimizers
@@ -6,8 +8,6 @@ Tasks:
   optimize debug mode
 
   nodelet multithread
-
-  cv::remap slow
 
   2 cameras fusing
 

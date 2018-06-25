@@ -17,7 +17,7 @@
 #include <g2o/solvers/dense/linear_solver_dense.h>
 #include "../helper.hpp"
 
-class PoseEdge:public g2o::BaseUnaryEdge<1, ScaleBatch, g2o::VertexSE3Expmap>
+class PoseEdge:public g2o::BaseUnaryEdge<1, Eigen::VectorXd, g2o::VertexSE3Expmap>
 {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW

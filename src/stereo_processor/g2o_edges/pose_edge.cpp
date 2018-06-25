@@ -1,4 +1,4 @@
-#include "stereo_camera/g2o_edges/pose_edge.hpp"
+#include "stereo_processor/g2o_edges/pose_edge.hpp"
 #include <g2o/core/factory.h>
 
 #include <iostream>
@@ -22,9 +22,9 @@ void PoseEdge::computeError()
     }
 	else
 	{
-        ScaleBatch batch;
+        Eigen::VectorXd batch;
         helper::getBatchAround(dest_img, u, v, batch);
-		_error(0,0) = (batch - _measurement).sum() / BATCH_SIZE / BATCH_SIZE;
+				_error = batch - _measurement;
         // cout<<"start_point"<<endl<<start_point<<endl<<"proj_point"<<endl<<proj_point<<endl<<"u"<<u<<" v "<<v<<endl<<"batch\t"<<batch<<endl<<"_meas\t"<<_measurement<<endl<<endl;
 	}
 }

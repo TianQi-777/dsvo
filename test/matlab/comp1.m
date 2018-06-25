@@ -1,13 +1,15 @@
 %% load data
 close all
 clear
-% dir = '/home/jiawei/Dropbox/mh_results/mh_01s';
-dir = '~/.ros';
+dir = '/home/jiawei/Desktop/results/stereo';
+dir = '/home/jiawei/Desktop/results/mono';
+dir = '/home/jiawei/Desktop/results/dsvo';
+% dir = '~/.ros';
 gt_a = load(strcat(dir,'/truth.txt'));
 vo = load(strcat(dir,'/vo.txt'));
 % vo(:,1) = vo(:,1) + 0.15;
-% gt_a = gt_a(1:end-50, :);
-% vo = vo(1:end-50, :);
+gt_a = gt_a(1:end-80, :);
+vo = vo(1:end-80, :);
 % gt_a = gt_a(15:end, :);
 % vo = vo(15:end, :);
 

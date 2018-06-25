@@ -3,10 +3,16 @@
 	<rosparam command="load" file="$(env HOME)/workspace/data/bags/stereo/aqua/cam0.yaml" ns="/cam0"/>
 	<rosparam command="load" file="$(env HOME)/workspace/data/bags/stereo/aqua/cam1.yaml" ns="/cam1"/>
 
-	 <node name="manager_node" pkg="dsvo" type="manager_node" output="screen" >
-	    <param name="cam0_topic" value="/camera_front_left/image_raw" />
-	    <param name="cam1_topic" value="/camera_front_right/image_raw" />
-	    <param name="cvt2VGA" value="true" />
-    </node>
+	<node name="stereo_rectifier_node" pkg="dsvo" type="stereo_rectifier_node" output="screen" >
+	 <param name="cam0_topic" value="/camera_front_left/image_raw" />
+	 <param name="cam1_topic" value="/camera_front_right/image_raw" />
+	 <param name="cvt2VGA" value="true" />
+	</node>
 
+	<node name="stereo_processor_node" pkg="dsvo" type="stereo_processor_node" output="screen" >
+		<param name="cam0_topic" value="/camera_front_left/image_raw" />
+		<param name="cam1_topic" value="/camera_front_right/image_raw" />
+		<param name="cvt2VGA" value="true" />
+		<param name="gt_type" value="point" />
+	</node>
 </launch>

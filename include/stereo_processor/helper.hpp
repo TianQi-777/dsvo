@@ -12,6 +12,9 @@
 #include <opencv2/plot.hpp>
 #include "data.hpp"
 
+#define BATCH_SIZE 5
+#define KLT_BATCH_SIZE 11
+
 namespace helper {
 
 	// sort KeyPoints for stereo match
@@ -78,21 +81,30 @@ namespace helper {
 		return res;
 	}
 
-	static void getBatchAround(const cv::Mat& img, double x, double y, ScaleBatch& batch) {
-		int half_size = BATCH_SIZE / 2;
+	static void getBatchAround(const cv::Mat& img, double x, double y, Eigen::VectorXd& batch, int bs=BATCH_SIZE) {
+		batch = Eigen::VectorXd(bs*bs);
+		int half_size = bs / 2;
 		int count = 0;
-		double cur_intensity;
-		double total_intensity;
 		for(double i=x-half_size; i<=x+half_size; i++) {
 			for(double j=y-half_size; j<=y+half_size; j++) {
-				cur_intensity = getPixelValue(img, i, j);
-				total_intensity += cur_intensity;
-				batch(0, count++) = cur_intensity;
+				double cur_intensity = getPixelValue(img, i, j);
+				batch(count++) = cur_intensity;
 			}
 		}
-		double mean = total_intensity / count;
-		for(int i=0; i<count; i++) {
-			// batch(0,i) = batch(0,i) - mean;
+	}
+
+	static void getBatchAroundWarp(const cv::Mat& img, double x, double y, Eigen::VectorXd& batch, int bs, const cv::Mat& H) {
+		batch = Eigen::VectorXd(bs*bs);
+		int half_size = bs / 2;
+		int count = 0;
+		for(double i=x-half_size; i<=x+half_size; i++) {
+			for(double j=y-half_size; j<=y+half_size; j++) {
+				cv::Mat proj = H*(cv::Mat_<double>(3,1)<<i, j, 1);
+				double u = proj.at<double>(0) / proj.at<double>(2);
+				double v = proj.at<double>(1) / proj.at<double>(2);
+				double cur_intensity = getPixelValue(img, u, v);
+				batch(count++) = cur_intensity;
+			}
 		}
 	}
 }
