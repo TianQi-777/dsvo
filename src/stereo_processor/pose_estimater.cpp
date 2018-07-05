@@ -23,8 +23,8 @@ double PoseEstimater::poseEstimatePymd(const std::vector<Eigen::Vector3d>& pts, 
 		Eigen::VectorXd batch;
 		helper::getBatchAround(source_img,fts[i].x,fts[i].y,batch);
 		edge->setMeasurement(batch);
-		edge->setInformation(Eigen::Matrix<double,1,1>::Identity());
-		// edge->setInformation((1.0/uncertainties[i])*Eigen::Matrix<double,1,1>::Identity());
+		// edge->setInformation(Eigen::Matrix<double,1,1>::Identity());
+		edge->setInformation((1.0/uncertainties[i])*Eigen::Matrix<double,1,1>::Identity());
     edge->setRobustKernel( new g2o::RobustKernelHuber() );
 		edge->setId(i+1);
 

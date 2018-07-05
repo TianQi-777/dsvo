@@ -16,7 +16,7 @@
 
 using namespace std;
 
-typedef g2o::BlockSolver< g2o::BlockSolverTraits<1, 1> >  KLTBlockSolver;
+typedef g2o::BlockSolver< g2o::BlockSolverTraits<2, 1> >  KLTBlockSolver;
 typedef g2o::LinearSolverCSparse<KLTBlockSolver::PoseMatrixType> KLTLinearSolver;
 
 class VertexKLT : public g2o::BaseVertex<2, Eigen::Vector2d>
@@ -46,7 +46,6 @@ class VertexKLT : public g2o::BaseVertex<2, Eigen::Vector2d>
 
     virtual void oplusImpl(const double* update)
     {
-      cout<<_estimate<<" oplusImpl "<<*update<<endl;
       Eigen::Vector2d::ConstMapType v(update);
       _estimate += v;
     }
@@ -71,7 +70,7 @@ class EdgeKLT : public g2o::BaseUnaryEdge<1, Eigen::VectorXd, VertexKLT>
     }
 
     void computeError();
-    void linearizeOplus();
+    // void linearizeOplus();
 
   private:
     const cv::Mat& img1;

@@ -7,9 +7,9 @@ stereo = load(strcat(dir,'/stereo.txt'));
 dsvo = load(strcat(dir,'/vo.txt'));
 dense = load(strcat(dir,'/truth.txt'));
 
-stereo = stereo(:,3:5);
-dsvo = dsvo(:,3:5);
-dense = dense(:,2:4);
+stereo = alignZ(stereo(:,3:5));
+dsvo = alignZ(dsvo(:,3:5));
+dense = alignZ(dense(:,2:4));
 figure('Name','Stereo')
 plot3(stereo(:,1), stereo(:,2), stereo(:,3), 'g.')
 axis equal

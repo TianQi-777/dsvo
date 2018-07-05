@@ -111,11 +111,11 @@ void StereoProcessor::monoTrack(const cv::Mat& cur_img0, const cv::Mat& cur_img1
 				stereo_match_flag = false;
 			  keyframes.push_back(keyframe);
 
-				if (LOOP_CLOSURE) {
-					// std::clock_t start = std::clock();
-					local_KF_optimizer.optimize(keyframes, 5, cam0);
-					// std::cout << "local_KF_optimizer: " << (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " ms" << std::endl;
-				}
+				// if (LOOP_CLOSURE) {
+				// 	// std::clock_t start = std::clock();
+				// 	local_KF_optimizer.optimize(keyframes, 5, cam0);
+				// 	// std::cout << "local_KF_optimizer: " << (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " ms" << std::endl;
+				// }
 
 				// update last frame with new points
 			  last_frame.features = keyframe.new_features;
@@ -187,16 +187,9 @@ bool StereoProcessor::propagateState(const cv::Mat& cur_img, KeyFrame& lastKF, F
 	cur_features_refined = cur_features;
   std::vector<uchar> status;
   std::vector<float> err;
-	// cv::calcOpticalFlowPyrLK(last_frame.img, cur_img, last_frame.feature_points.features, cur_features_refined, status, err, cv::Size(OF_size,OF_size), PROP_PYMD);
-  // cv::calcOpticalFlowPyrLK(last_frame.img, cur_img, last_frame.feature_points.features(), cur_features_refined, status, err, cv::Size(OF_size,OF_size), PROP_PYMD,
-	// 												 cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
-	std::vector<cv::Point3f> last_frame_feature_points_features_d;
-	for(int i=0; i<last_frame.feature_points.size(); i++) {
-		last_frame_feature_points_features_d.push_back(cv::Point3f(last_frame.feature_points[i].feature.x,
-																															 last_frame.feature_points[i].feature.y,
-																															 last_frame.feature_points[i].point.point.z));
-	}
-	klt.compute(last_frame.img, cur_img, last_frame_feature_points_features_d, cur_features_refined, cam.K, R_cv, t_cv, status, err, PROP_PYMD);
+	cv::calcOpticalFlowPyrLK(last_frame.img, cur_img, last_frame.feature_points.features(), cur_features_refined, status, err, cv::Size(OF_size,OF_size), PROP_PYMD,
+													 cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
+
 
 	// remove point outliers
 	std::vector<cv::Point2f> lastKF_features_inlier, cur_features_refined_inlier;
@@ -211,7 +204,7 @@ bool StereoProcessor::propagateState(const cv::Mat& cur_img, KeyFrame& lastKF, F
 	if(DEBUG) std::cout<<"propagate refine: "<<last_frame.feature_points.size()<<" -> "<<lastKF_points_inlier.size()<<std::endl;
 
 	if(float(lastKF_points_inlier.size()) / last_frame.feature_points.size() < PROP_PTS_RATIO){
-		std::cout<<"propagateState refine ratio too low "<<std::endl;
+		std::cout<<"propagateState refine ratio too low: "<<float(lastKF_points_inlier.size()) / last_frame.feature_points.size()<<std::endl;
 		last_frame.feature_points.clear();
 		// cv::waitKey();
 		return false;
@@ -221,8 +214,18 @@ bool StereoProcessor::propagateState(const cv::Mat& cur_img, KeyFrame& lastKF, F
 	/******************************************refine pose******************************************/
 	Eigen::Matrix3d R_lastKF = R_last_frame * last_frame.pose_from_lastKF.orientation.toRotationMatrix();
 	Eigen::Vector3d t_lastKF = R_last_frame * last_frame.pose_from_lastKF.position + t_last_frame;
+	if(DEBUG) {
+		cv::Mat test = cur_img.clone();
+		helper::project3DPtsToImg(lastKF_points_inlier.points(), cam.K, R_lastKF, t_lastKF, test);
+		cv::imshow("refine_pose before", test);
+	}
 	pose_estimater.refine_pose(lastKF_points_inlier, cur_features_refined_inlier, cam.K, R_lastKF, t_lastKF);
 
+	if(DEBUG) {
+		cv::Mat test1 = cur_img.clone();
+		helper::project3DPtsToImg(lastKF_points_inlier.points(), cam.K, R_lastKF, t_lastKF, test1);
+		cv::imshow("refine_pose after", test1);
+	}
   // propagate feature_points to current frame
 	cv::eigen2cv(R_lastKF, R_cv);
 	cv::eigen2cv(t_lastKF, t_cv);
@@ -259,7 +262,7 @@ bool StereoProcessor::propagateState(const cv::Mat& cur_img, KeyFrame& lastKF, F
 	cv::imshow("propagate projection", prop_img);
 
 	if(float(lastKF.feature_points.size()) / lastKF_points_inlier.size() < PROP_PTS_RATIO){
-		std::cout<<"propagateState ratio too low "<<std::endl;
+		std::cout<<"propagateState ratio too low: "<<float(lastKF.feature_points.size()) / lastKF_points_inlier.size()<<std::endl;
 		last_frame.feature_points.clear();
 		// cv::waitKey();
 		return false;
@@ -278,11 +281,11 @@ bool StereoProcessor::propagateState(const cv::Mat& cur_img, KeyFrame& lastKF, F
 	Eigen::Matrix3d R_w = _R * cam.R_B2C;
 	Eigen::Vector3d t_w = _R*(cam.t_B2C-t_lastKF) + lastKF.pose.orientation.toRotationMatrix()*cam.t_C2B + lastKF.pose.position;
   Eigen::Vector3d velocity = (t_w - lastKF.pose.position) / (cur_time - lastKF.time);
-	if(velocity.norm() > MAX_VEL) {
-		std::cout<<"exceed max velocity: "<<velocity.norm()<<std::endl;
-		last_frame.feature_points.clear();
-		return false;
-	}
+	// if(velocity.norm() > MAX_VEL) {
+	// 	std::cout<<"exceed max velocity: "<<velocity.norm()<<std::endl;
+	// 	last_frame.feature_points.clear();
+	// 	return false;
+	// }
 	state.pose.position = t_w;
 	state.pose.orientation = Eigen::Quaterniond(R_w);
 

@@ -26,9 +26,9 @@
 #include "helper.hpp"
 #include "pose_estimater.hpp"
 #include "reconstructor.hpp"
-#include "klt.hpp"
+// #include "klt.hpp"
 #include "scale_optimizer.hpp"
-#include "local_KF_optimizer.hpp"
+// #include "local_KF_optimizer.hpp"
 #include "comparer.hpp"
 #include "odom_comparer.hpp"
 #include "point_comparer.hpp"
@@ -43,7 +43,7 @@ private:
 
 	// parameters
   int OF_size = 11;       // optical flow size
-	float MAX_VEL = 3;      // max pose propagation velocity
+	// float MAX_VEL = 10;      // max pose propagation velocity
 
   int BLUR_SZ;            // blur size
   double BLUR_VAR;        // blur value
@@ -102,8 +102,8 @@ private:
 	PoseEstimater pose_estimater;
 	Reconstructor reconstructor;
 	ScaleOptimizer scale_optimizer;
-	KLT klt;
-	LocalKFOptimizer local_KF_optimizer;
+	// KLT klt;
+	// LocalKFOptimizer local_KF_optimizer;
 	void track(const cv::Mat& _cur_img0, const cv::Mat& _cur_img1, double _cur_time);
 	void monoTrack(const cv::Mat& cur_img0, const cv::Mat& cur_img1, const CameraModel& cam0, const CameraModel& cam1, Frame& last_frame, std::vector<KeyFrame>& keyframes, const std::string& window_name);
  	bool propagateState(const cv::Mat& cur_img, KeyFrame& lastKF, Frame& last_frame, const CameraModel& cam, FeaturePoints& cur_feature_points);

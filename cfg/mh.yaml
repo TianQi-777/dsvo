@@ -12,7 +12,7 @@ dictitems:
   FEATURE_THRES: 20
   KF_DIST: 0.3
   LOOP_CLOSURE: false
-  PROP_MAX_STEP: 20
+  PROP_MAX_STEP: 50
   PROP_MIN_POINTS: 20
   PROP_PROJ_DIST: 5.0
   PROP_PTS_RATIO: 0.7
@@ -35,7 +35,7 @@ dictitems:
       FEATURE_THRES: 20
       KF_DIST: 0.3
       LOOP_CLOSURE: false
-      PROP_MAX_STEP: 20
+      PROP_MAX_STEP: 50
       PROP_MIN_POINTS: 20
       PROP_PROJ_DIST: 5.0
       PROP_PTS_RATIO: 0.7

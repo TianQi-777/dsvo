@@ -1,7 +1,7 @@
 <launch>
 
-	<rosparam command="load" file="$(env HOME)/workspace/data/bags/stereo/kitti/cam0.yaml" ns="/cam0"/>
-	<rosparam command="load" file="$(env HOME)/workspace/data/bags/stereo/kitti/cam1.yaml" ns="/cam1"/>
+	<rosparam command="load" file="$(env HOME)/workspace/data/cams/kitti/cam0.yaml" ns="/cam0"/>
+	<rosparam command="load" file="$(env HOME)/workspace/data/cams/kitti/cam1.yaml" ns="/cam1"/>
 
 	<node name="stereo_rectifier_node" pkg="dsvo" type="stereo_rectifier_node" output="screen" >
 		<param name="cam0_topic" value="/kitti/left/image_raw_color" />

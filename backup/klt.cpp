@@ -27,54 +27,41 @@ void KLT::compute_pymd(const cv::Mat& prev_img, const cv::Mat& next_img, const s
 		double d = prev_fts_d[i].z;
 		if(d<0.001) continue;
 
-						std::cout<<"3"<<std::endl;
 		Eigen::Vector2d est;
 		est << next_fts[i].x, next_fts[i].y;
-								std::cout<<"31"<<std::endl;
 		VertexKLT* v = new VertexKLT();
 		v->setEstimate(est);
-								std::cout<<"32"<<std::endl;
 		v->setId(0);
 		optimizer.addVertex(v);
 
-						std::cout<<"4"<<std::endl;
 		EdgeKLT* e = new EdgeKLT(next_img, next_Ix, next_Iy);
 		e->setVertex(0, v);
-								std::cout<<"41"<<std::endl;
 		//get homography from next to prev
 		cv::Mat R_t;
 		cv::transpose(R, R_t);
 		cv::Mat H = K*(R_t-(1.0/d)*R_t*t*(cv::Mat_<double>(1,3)<<0, 0, 1))*K_inv;
 		Eigen::VectorXd batch;
-								std::cout<<"42"<<std::endl;
 		helper::getBatchAround(prev_img, prev_fts.x, prev_fts.y, batch, KLT_BATCH_SIZE);
 		// helper::getBatchAroundWarp(prev_img, prev_fts.x, prev_fts.y, batch, KLT_BATCH_SIZE, H);
-								std::cout<<"5"<<std::endl;
 		e->setMeasurement(batch);
 		// e->setInformation(Eigen::Matrix<double,1,1>::Identity());
 		e->setInformation(Eigen::Matrix<double,1,1>::Identity());
-    e->setRobustKernel( new g2o::RobustKernelHuber() );
+    // e->setRobustKernel( new g2o::RobustKernelHuber() );
 		e->setId(1);
 		optimizer.addEdge(e);
-		std::cout<<"6"<<std::endl;
 
-		optimizer.setVerbose(true);
+		// optimizer.setVerbose(true);
 		optimizer.initializeOptimization();
-		optimizer.optimize(20);
-		std::cout<<"7"<<std::endl;
+		optimizer.optimize(10);
 
 		if(e->level()>0) status[i] = 0;
-
 		next_fts[i].x = v->estimate()(0);
 		next_fts[i].y = v->estimate()(1);
 		e->computeError();
 		err[i] = e->chi2();
-		std::cout<<"8"<<std::endl;
 
 		optimizer.clear();
-		std::cout<<"9"<<std::endl;
 	}
-	std::cout<<"10"<<std::endl;
 
 }
 
@@ -109,6 +96,12 @@ void KLT::compute(const cv::Mat& prev_img, const cv::Mat& next_img, const std::v
 		pymd_scale *= 2.0;
 	}
 
+	cv::Mat test = next_img.clone();
+	cv::cvtColor(test, test, cv::COLOR_GRAY2BGR);
+	for(int i=0; i<next_fts.size(); i++) {
+	cv::circle(test, next_fts[i], 1, cv::Scalar(0,0,255));
+	}
+	cv::imshow("before", test);
 	// set next_fts to initial pyramid
 	double div = 2.0; for(int i=0; i<maxLevel; i++) div /= 2.0;
 	for(int i=0; i<next_fts.size(); i++) {
@@ -116,10 +109,18 @@ void KLT::compute(const cv::Mat& prev_img, const cv::Mat& next_img, const std::v
 		status.push_back(1);
 		err.push_back(0);
 	}
-
 	for(int i=maxLevel-1; i>=0; i--)
 	{
 		compute_pymd(prev_img_pymd[i], next_img_pymd[i], prev_fts_pymd[i], next_fts, K_pymd[i], R, t, status, err);
 		if(i!=0) for(int j=0; j<next_fts.size(); j++) next_fts[j] = 2.0*next_fts[j];	// bring to higher pyramid level
 	}
+
+
+cv::Mat test1 = next_img.clone();
+cv::cvtColor(test1, test1, cv::COLOR_GRAY2BGR);
+for(int i=0; i<next_fts.size(); i++) {
+	cv::circle(test1, next_fts[i], 1, cv::Scalar(0,0,255));
+}
+cv::imshow("after", test1);
+cv::waitKey(1);
 }

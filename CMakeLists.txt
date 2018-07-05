@@ -42,8 +42,6 @@ target_link_libraries(stereo_rectifier_node
 add_executable(stereo_processor_node
   src/stereo_processor/g2o_edges/scale_edge.cpp
   src/stereo_processor/g2o_edges/pose_edge.cpp
-  src/stereo_processor/g2o_edges/klt_edge.cpp
-  src/stereo_processor/g2o_edges/edge_se3m.cpp
   test/src/odom_comparer.cpp
   test/src/point_comparer.cpp
   test/src/trans_comparer.cpp
@@ -54,8 +52,6 @@ add_executable(stereo_processor_node
   src/stereo_processor/stereo_processor_node.cpp
   src/stereo_processor/reconstructor.cpp
   src/stereo_processor/scale_optimizer.cpp
-  src/stereo_processor/klt.cpp
-  src/stereo_processor/local_KF_optimizer.cpp
   src/stereo_processor/pose_estimater.cpp)
 
 add_dependencies(stereo_processor_node ${PROJECT_NAME}_gencfg)
