@@ -5,9 +5,11 @@ clear
 dir = '~/.ros';
 gt = load(strcat(dir,'/truth.txt'));
 dsvo = load(strcat(dir,'/vo.txt'));
+dsvo = dsvo(:, [1,3,4,5]);
 sptam = load(strcat(dir,'/sptam.txt'));
-% dsvo(:,1) = dsvo(:,1) + 0.15;
-% sptam(:,1) = sptam(:,1) + 0.15;
+dsvo(:,1) = dsvo(:,1) + 0.15;
+sptam(:,1) = sptam(:,1) + 0.15;
+gt = gt(500:end, :); dsvo = dsvo(500:end, :); sptam = sptam(500:end, :);
 i = 1; % index of gt
 while(gt(i,1) < dsvo(1,1) || gt(i,1) < sptam(1,1))
     i = i+1;
@@ -69,7 +71,6 @@ title('Sorted absolute scale error');
 perct = dsvo_sortn(floor(0.95*length(dsvo_sortn)));
 ylim([0 perct]);
 
-plot_time
 
 function [gtp, vop, gtt, vot, gtvn, vovn] = comp_func(gt, vo)
 % get overlap of gt with vo
@@ -91,39 +92,35 @@ while i<=size(gt,1)
     k = k+1;
 end
 % use range of idx
-idx = 20:size(vo_n,1);
+idx = 1:size(vo_n,1);
 % idx = [size(gt,1):-1:size(gt,1)-200];
 vo = vo_n(idx, :);
 gt = gt(idx, :);
 
 %% align two set of points
-sz = size(gt,1);
-% sz = 20;
-A = zeros(3*sz, 12);
-b = zeros(3*sz, 1);
-% for i=1:size(gt,1)
-for i=1:sz
-    A(3*(i-1)+1, 1:3) = vo(i,2:4);
-    A(3*(i-1)+2, 4:6) = vo(i,2:4);
-    A(3*(i-1)+3, 7:9) = vo(i,2:4);
-    A(3*(i-1)+1:3*(i-1)+3, 10:12) = eye(3);
-    
-    b(3*(i-1)+1:3*(i-1)+3, 1) = gt(i,2:4)';
+cg = mean(gt(:,2:4));
+cv = mean(vo(:,2:4));
+H = zeros(3,3);
+for i=1:length(gt)
+    H = H + (gt(i,2:4)-cg)'*(vo(i,2:4)-cv);
 end
-x = A\b;
-R = [x(1:3,1)'; x(4:6,1)'; x(7:9,1)'];
-t = x(10:12,1);
-[U,S,V] = svd(R);
+[U,~,V] = svd(H);
 R = U*V';
-t = t / S(1,1);
-
 for i=1:size(vo,1)
-    p = R*vo(i,2:4)' + t;
+    p = R*vo(i,2:4)';
     vo(i,2:4) = p';
+end
+cg = mean(gt(:,2:4));
+cv = mean(vo(:,2:4));
+for i=size(vo,1):-1:1
+    vo(i,2:4) = vo(i,2:4) - cv;
+end
+for i=size(gt,1):-1:1
+    gt(i,2:4) = gt(i,2:4) - cg;
 end
 
 %% plot results
-step = 20;
+step = floor(length(vo) / (vo(end,1)-vo(1,1))); % step of 1 sec
 
 % calculate vo translation
 for i=1+step:size(vo,1)

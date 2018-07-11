@@ -5,10 +5,10 @@ dictitems:
   BA_REPROJ_DIST: 1.0
   BLUR_SZ: 3
   BLUR_VAR: 0.5
-  DEBUG: true
-  FEATURES_PER_CELL: 2
+  DEBUG: false
+  FEATURES_PER_CELL: 1
   FEATURE_BLOCKS: 12
-  FEATURE_OF_PYMD: 3
+  FEATURE_OF_PYMD: 5
   FEATURE_THRES: 20
   KF_DIST: 0.3
   LOOP_CLOSURE: false
@@ -28,10 +28,10 @@ dictitems:
       BA_REPROJ_DIST: 1.0
       BLUR_SZ: 3
       BLUR_VAR: 0.5
-      DEBUG: true
-      FEATURES_PER_CELL: 2
+      DEBUG: false
+      FEATURES_PER_CELL: 1
       FEATURE_BLOCKS: 12
-      FEATURE_OF_PYMD: 3
+      FEATURE_OF_PYMD: 5
       FEATURE_THRES: 20
       KF_DIST: 0.3
       LOOP_CLOSURE: false

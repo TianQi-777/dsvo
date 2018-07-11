@@ -24,7 +24,7 @@ void PoseEdge::computeError()
 	{
         Eigen::VectorXd batch;
         helper::getBatchAround(dest_img, u, v, batch);
-				_error = batch - _measurement;
+				_error(0,0) = (batch - _measurement).sum() / BATCH_SIZE / BATCH_SIZE;
         // cout<<"start_point"<<endl<<start_point<<endl<<"proj_point"<<endl<<proj_point<<endl<<"u"<<u<<" v "<<v<<endl<<"batch\t"<<batch<<endl<<"_meas\t"<<_measurement<<endl<<endl;
 	}
 }

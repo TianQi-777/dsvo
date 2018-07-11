@@ -43,7 +43,7 @@ private:
 
 	// parameters
   int OF_size = 11;       // optical flow size
-	// float MAX_VEL = 10;      // max pose propagation velocity
+	float MAX_VEL = 30;      // max pose propagation velocity
 
   int BLUR_SZ;            // blur size
   double BLUR_VAR;        // blur value
@@ -85,6 +85,10 @@ private:
 	std::vector<KeyFrame> keyframes0;
 	std::vector<KeyFrame> keyframes1;
 	bool param_changed;
+
+	// camera pose between consecutive frames
+	Eigen::Matrix3d R_last_frame;
+	Eigen::Vector3d t_last_frame;
 
   // components for testing
 	Comparer* comparer;

@@ -49,6 +49,8 @@ void StereoProcessor::monoTrack(const cv::Mat& cur_img0, const cv::Mat& cur_img1
 		last_frame.pose_from_lastKF = Pose();
 	  last_frame.img = keyframe.img0.clone();
 		last_time = cur_time;
+		R_last_frame = Eigen::Matrix3d::Identity();
+		t_last_frame = Eigen::Vector3d::Zero();
 
   	return;
   }
@@ -170,8 +172,6 @@ bool StereoProcessor::propagateState(const cv::Mat& cur_img, KeyFrame& lastKF, F
 	std::clock_t start = std::clock();
 
 	/******************************************calculate pose by direct method******************************************/
-	Eigen::Matrix3d R_last_frame = Eigen::Matrix3d::Identity();
-	Eigen::Vector3d t_last_frame = Eigen::Vector3d::Zero();
 	double dist = pose_estimater.poseEstimate(last_frame.feature_points, last_frame.img, cam.K, cur_img, PROP_PYMD, PROP_MAX_STEP, R_last_frame, t_last_frame);
 	time_ofs << "121 " << cur_time-init_time << " " << (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " -1" << std::endl;
 	/******************************************calculate pose by direct method******************************************/
@@ -205,6 +205,8 @@ bool StereoProcessor::propagateState(const cv::Mat& cur_img, KeyFrame& lastKF, F
 
 	if(float(lastKF_points_inlier.size()) / last_frame.feature_points.size() < PROP_PTS_RATIO){
 		std::cout<<"propagateState refine ratio too low: "<<float(lastKF_points_inlier.size()) / last_frame.feature_points.size()<<std::endl;
+		R_last_frame = Eigen::Matrix3d::Identity();
+		t_last_frame = Eigen::Vector3d::Zero();
 		last_frame.feature_points.clear();
 		// cv::waitKey();
 		return false;
@@ -263,6 +265,8 @@ bool StereoProcessor::propagateState(const cv::Mat& cur_img, KeyFrame& lastKF, F
 
 	if(float(lastKF.feature_points.size()) / lastKF_points_inlier.size() < PROP_PTS_RATIO){
 		std::cout<<"propagateState ratio too low: "<<float(lastKF.feature_points.size()) / lastKF_points_inlier.size()<<std::endl;
+		R_last_frame = Eigen::Matrix3d::Identity();
+		t_last_frame = Eigen::Vector3d::Zero();
 		last_frame.feature_points.clear();
 		// cv::waitKey();
 		return false;
@@ -281,11 +285,13 @@ bool StereoProcessor::propagateState(const cv::Mat& cur_img, KeyFrame& lastKF, F
 	Eigen::Matrix3d R_w = _R * cam.R_B2C;
 	Eigen::Vector3d t_w = _R*(cam.t_B2C-t_lastKF) + lastKF.pose.orientation.toRotationMatrix()*cam.t_C2B + lastKF.pose.position;
   Eigen::Vector3d velocity = (t_w - lastKF.pose.position) / (cur_time - lastKF.time);
-	// if(velocity.norm() > MAX_VEL) {
-	// 	std::cout<<"exceed max velocity: "<<velocity.norm()<<std::endl;
-	// 	last_frame.feature_points.clear();
-	// 	return false;
-	// }
+	if(velocity.norm() > MAX_VEL) {
+		std::cout<<"exceed max velocity: "<<velocity.norm()<<std::endl;
+		last_frame.feature_points.clear();
+		R_last_frame = Eigen::Matrix3d::Identity();
+		t_last_frame = Eigen::Vector3d::Zero();
+		return false;
+	}
 	state.pose.position = t_w;
 	state.pose.orientation = Eigen::Quaterniond(R_w);
 
@@ -311,7 +317,11 @@ bool StereoProcessor::reconstructAndOptimize(KFData& kf_data, const KeyFrame& la
 	cv::Mat _angle = _t_lastKF2Cur*kf_data.t_lastKF2Cur;
 	double angle = _angle.at<double>(0,0);
 	if(DEBUG) std::cout<<"reconstructAndBundleAdjust angle= "<<angle<<" ratio= "<<kf_data.size() << "/" << orig_fts_size<<std::endl;
-	if(angle<0.9 || kf_data.size() / orig_fts_size < BA_INLIER_THRES) return false;
+	if(angle<0.9 || kf_data.size() / orig_fts_size < BA_INLIER_THRES) {
+		R_last_frame = Eigen::Matrix3d::Identity();
+		t_last_frame = Eigen::Vector3d::Zero();
+		return false;
+	}
 
 	time_ofs << "131 " << cur_time-init_time << " " << (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " -1" << std::endl;
 
@@ -349,6 +359,8 @@ bool StereoProcessor::reconstructAndOptimize(KFData& kf_data, const KeyFrame& la
   time_ofs << "132 " << cur_time-init_time << " " << (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " -1" << std::endl;
 	if(!(new_scale>0.01 && new_scale<2*scale)) {
 		std::cout<<"bad scale after: "<<new_scale<<std::endl;
+		R_last_frame = Eigen::Matrix3d::Identity();
+		t_last_frame = Eigen::Vector3d::Zero();
 		return false;
 	}
   scale = new_scale;
