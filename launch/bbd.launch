@@ -13,7 +13,10 @@
 		<param name="cam0_topic" value="/cam_fl/image_raw" />
 		<param name="cam1_topic" value="/cam_fr/image_raw" />
 		<param name="cvt2VGA" value="false" />
-		<param name="gt_type" value="point" />
 	</node>
+
+	<node name="comparer_node" pkg="dsvo" type="comparer_node" args="point" />
+
+	<node name="dynamic_reconfigure_load" pkg="dynamic_reconfigure" type="dynparam" args="load /stereo_processor_node $(find dsvo)/cfg/bbd.yaml" />
 
 </launch>

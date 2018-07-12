@@ -128,18 +128,6 @@ StereoProcessor::StereoProcessor() {
 	camera0.stereo = stereo1;
 	/***********************stereo rectify end***********************/
 
-	// ground truth type
-	string gt_type = "";
-	nhPriv.getParam("gt_type", gt_type);
-	if(gt_type == "odom")
-	{
-		comparer = new OdomComparer();
-	} else if(gt_type == "point") {
-		comparer = new PointComparer();
-	} else {
-		comparer = new TransComparer();
-	}
-
 	// subscribe to rect_img topics
 	cam0_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, RECT_IMG0_TOPIC, 1000);
 	cam1_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, RECT_IMG1_TOPIC, 1000);

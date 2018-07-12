@@ -42,10 +42,6 @@ target_link_libraries(stereo_rectifier_node
 add_executable(stereo_processor_node
   src/stereo_processor/g2o_edges/scale_edge.cpp
   src/stereo_processor/g2o_edges/pose_edge.cpp
-  test/src/odom_comparer.cpp
-  test/src/point_comparer.cpp
-  test/src/trans_comparer.cpp
-  test/src/comparer.cpp
   src/state.cpp
   src/stereo_processor/stereo_processor.cpp
   src/stereo_processor/stereo_processor_helpers.cpp
@@ -64,14 +60,25 @@ target_link_libraries(stereo_processor_node
   g2o_core g2o_types_slam3d g2o_solver_csparse csparse g2o_stuff g2o_csparse_extension g2o_types_sba cholmod
 )
 
-add_executable(zed_split src/tools/zed_split.cpp)
+add_executable(comparer_node
+  test/src/comparer_node.cpp
+  test/src/odom_comparer.cpp
+  test/src/point_comparer.cpp
+  test/src/trans_comparer.cpp
+  test/src/comparer.cpp)
+
+target_link_libraries(comparer_node
+  ${catkin_LIBRARIES}
+)
+
+add_executable(zed_split tools/zed_split.cpp)
 
 target_link_libraries(zed_split
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
 )
 
-add_executable(kitti_pub src/tools/kitti_pub.cpp)
+add_executable(kitti_pub tools/kitti_pub.cpp)
 
 target_link_libraries(kitti_pub
   ${catkin_LIBRARIES}

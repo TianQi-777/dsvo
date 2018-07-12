@@ -29,10 +29,6 @@
 // #include "klt.hpp"
 #include "scale_optimizer.hpp"
 // #include "local_KF_optimizer.hpp"
-#include "comparer.hpp"
-#include "odom_comparer.hpp"
-#include "point_comparer.hpp"
-#include "trans_comparer.hpp"
 
 typedef pcl::PointCloud<pcl::PointXYZI> PointCloud;
 
@@ -91,11 +87,9 @@ private:
 	Eigen::Vector3d t_last_frame;
 
   // components for testing
-	Comparer* comparer;
 	std::ofstream time_ofs;
   PointCloud::Ptr point_cloud;
   bool stereo_match_flag;     // stereo match is called if dsvo failed to generate points
-	void truth_Callback(const geometry_msgs::PointStamped::ConstPtr& msg);
 
   // record times
   double init_time=-1.0;

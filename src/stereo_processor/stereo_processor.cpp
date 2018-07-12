@@ -20,8 +20,7 @@ void StereoProcessor::track(const cv::Mat& cur_img0, const cv::Mat& cur_img1, do
 	monoTrack(cur_img0, cur_img1, camera0, camera1, last_frame0, keyframes0, "Left");
 	// monoTrack(cur_img1, cur_img0, camera1, camera0, last_frame1, keyframes1, "Right");
 
-  state.showPose();
-  comparer->write_vo(state.pose, cur_time, stereo_match_flag);
+  state.showPose(stereo_match_flag);
 	time_ofs << "0 " << cur_time-init_time <<" "<< (std::clock() - frame_start) / (double)(CLOCKS_PER_SEC / 1000) << " -1" << std::endl;
   // if(DEBUG) cv::waitKey();
 }

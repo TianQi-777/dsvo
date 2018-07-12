@@ -13,9 +13,11 @@
 		<param name="cam0_topic" value="/zed/left/image_raw_color" />
 		<param name="cam1_topic" value="/zed/right/image_raw_color" />
 		<param name="cvt2VGA" value="false" />
-		<param name="gt_type" value="odom" />
 	</node>
+
+	<node name="comparer_node" pkg="dsvo" type="comparer_node" args="odom" />
 
 	<node name="zed_split" pkg="dsvo" type="zed_split" args="0" output="screen" />
 
+	<node name="dynamic_reconfigure_load" pkg="dynamic_reconfigure" type="dynparam" args="load /stereo_processor_node $(find dsvo)/cfg/zed.yaml" />
 </launch>

@@ -1,7 +1,6 @@
 % load data
 close all
 clear
-% dir = '/home/jiawei/Dropbox/mh_results/mh_01s';
 dir = '~/.ros';
 gt = load(strcat(dir,'/truth.txt'));
 dsvo = load(strcat(dir,'/vo.txt'));
@@ -9,7 +8,7 @@ dsvo = dsvo(:, [1,3,4,5]);
 sptam = load(strcat(dir,'/sptam.txt'));
 dsvo(:,1) = dsvo(:,1) + 0.15;
 sptam(:,1) = sptam(:,1) + 0.15;
-gt = gt(500:end, :); dsvo = dsvo(500:end, :); sptam = sptam(500:end, :);
+% gt = gt(500:end, :); dsvo = dsvo(500:end, :); sptam = sptam(500:end, :);
 i = 1; % index of gt
 while(gt(i,1) < dsvo(1,1) || gt(i,1) < sptam(1,1))
     i = i+1;
@@ -17,7 +16,7 @@ end
 gt = gt(i:end, :);
 
 disp('DSVO')
-[gtp, dsvop, gtt, dsvot, gtvn, dsvovn] = comp_func(gt, dsvo);
+[gtp, dsvop, gtt, dsvot, gtvn, dsvovn] = alignGT(gt, dsvo);
 dsvo_diffn = abs(gtvn - dsvovn);
 dsvo_pern = dsvo_diffn ./ gtvn;
 dsvo_pern = sum(dsvo_pern) / length(dsvo_pern);
@@ -26,7 +25,7 @@ fprintf('Median offset of scale = %f\n', median(dsvo_diffn));
 fprintf('Average offset percentage of scale = %f\n', dsvo_pern);
 
 disp('S-PTAM')
-[~, sptamp, ~, sptamt, gtvn, sptamvn] = comp_func(gt, sptam);
+[~, sptamp, ~, sptamt, gtvn, sptamvn] = alignGT(gt, sptam);
 sptam_diffn = abs(gtvn - sptamvn);
 sptam_pern = sptam_diffn ./ gtvn;
 sptam_pern = sum(sptam_pern) / length(sptam_pern);
@@ -71,8 +70,7 @@ title('Sorted absolute scale error');
 perct = dsvo_sortn(floor(0.95*length(dsvo_sortn)));
 ylim([0 perct]);
 
-
-function [gtp, vop, gtt, vot, gtvn, vovn] = comp_func(gt, vo)
+function [gtp, vop, gtt, vot, gtvn, vovn] = alignGT(gt, vo)
 % get overlap of gt with vo
 i = 1; % index of gt
 j = 1; % index of vo
@@ -85,8 +83,12 @@ while i<=size(gt,1)
         break;
     else
         vo_n(k,1) = gt(i,1);
-        inc = (vo(j,2:4) - vo(j-1,2:4))/(vo(j,1) - vo(j-1,1));
-        vo_n(k,2:4) = vo(j-1,2:4) + (gt(i,1) - vo(j-1,1))*inc;
+        if(gt(i,1) ~= vo(j,1))
+            inc = (vo(j,2:4) - vo(j-1,2:4))/(vo(j,1) - vo(j-1,1));
+            vo_n(k,2:4) = vo(j-1,2:4) + (gt(i,1) - vo(j-1,1))*inc;
+        else
+            vo_n(k,2:4) = vo(j,2:4);
+        end
     end
     i = i+1;
     k = k+1;

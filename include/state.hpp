@@ -3,7 +3,7 @@
 
 #include <opencv2/core.hpp>
 #include <ros/ros.h>
-#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
@@ -28,7 +28,7 @@ struct State {
 	ros::NodeHandle nh;
 	ros::Publisher pose_pub;
 	void reset();
-	void showPose();
+	void showPose(bool stereo_match_flag);
 };
 
 #endif
