@@ -7,8 +7,6 @@ dictitems:
   FEATURE_THRES: 10
   FEATURE_OF_PYMD: 2
   FEATURE_BLOCKS: 10
-  LOOP_CLOSURE: false
-  REFINE_PIXEL: false
   MAX_E_DIST: 1.0
   MAX_FEATURES: 250
   BA_REPROJ_DIST: 1
@@ -30,8 +28,6 @@ dictitems:
       FEATURE_THRES: 10
       FEATURE_OF_PYMD: 2
       FEATURE_BLOCKS: 10
-      REFINE_PIXEL: false
-      LOOP_CLOSURE: false
       MAX_E_DIST: 1.0
       MAX_FEATURES: 250
       BA_REPROJ_DIST: 1

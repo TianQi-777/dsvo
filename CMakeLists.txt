@@ -30,8 +30,8 @@ catkin_package()
 include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS} include test/include)
 
 add_executable(stereo_rectifier_node
-  src/stereo_rectifier_node.cpp
-  src/stereo_rectifier.cpp
+  src/stereo_rectifier/stereo_rectifier_node.cpp
+  src/stereo_rectifier/stereo_rectifier.cpp
 )
 
 target_link_libraries(stereo_rectifier_node
@@ -71,9 +71,9 @@ target_link_libraries(comparer_node
   ${catkin_LIBRARIES}
 )
 
-add_executable(zed_split tools/zed_split.cpp)
+add_executable(stereo_split tools/stereo_split.cpp)
 
-target_link_libraries(zed_split
+target_link_libraries(stereo_split
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
 )

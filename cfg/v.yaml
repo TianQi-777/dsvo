@@ -11,13 +11,11 @@ dictitems:
   FEATURE_OF_PYMD: 2
   FEATURE_THRES: 5
   KF_DIST: 0.1
-  LOOP_CLOSURE: false
   PROP_MAX_STEP: 20
   PROP_MIN_POINTS: 20
   PROP_PROJ_DIST: 5.0
   PROP_PTS_RATIO: 0.7
   PROP_PYMD: 2
-  REFINE_PIXEL: false
   SCALE_MAX_STEP: 50
   SCALE_PYMD: 2
   TEST_STEREO: false
@@ -34,13 +32,11 @@ dictitems:
       FEATURE_OF_PYMD: 2
       FEATURE_THRES: 5
       KF_DIST: 0.1
-      LOOP_CLOSURE: false
       PROP_MAX_STEP: 20
       PROP_MIN_POINTS: 20
       PROP_PROJ_DIST: 5.0
       PROP_PTS_RATIO: 0.7
       PROP_PYMD: 2
-      REFINE_PIXEL: false
       SCALE_MAX_STEP: 50
       SCALE_PYMD: 2
       TEST_STEREO: false

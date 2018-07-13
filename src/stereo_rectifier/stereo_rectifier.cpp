@@ -1,4 +1,4 @@
-#include "stereo_rectifier.hpp"
+#include "stereo_rectifier/stereo_rectifier.hpp"
 
 StereoRectifier::StereoRectifier() {
 	ros::NodeHandle nhPriv("~");

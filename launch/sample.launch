@@ -1,0 +1,25 @@
+<launch>
+	<!-- camera calibration files -->
+	<rosparam command="load" file="CHANGE:path/to/camera0/calibration/yaml" ns="/cam0"/>
+	<rosparam command="load" file="CHANGE:path/to/camera1/calibration/yaml" ns="/cam1"/>
+
+	<!-- stereo rectification node -->
+	<node name="stereo_rectifier_node" pkg="dsvo" type="stereo_rectifier_node">
+		<param name="cam0_topic" value="CHANGE:cam0_topic" />
+		<param name="cam1_topic" value="CHANGE:cam1_topic" />
+		<param name="cvt2VGA" value="false" />
+	</node>
+
+	<!-- stereo processing node -->
+	<node name="stereo_processor_node" pkg="dsvo" type="stereo_processor_node" output="screen" />
+
+	<!-- (optional) comparision node -->
+	<!-- <node name="comparer_node" pkg="dsvo" type="comparer_node" args="CHOOSE:odom/point/trans" /> -->
+
+	<!-- (optional) split UVC stereo image to two topics -->
+	<!-- if enabled, cam0_topic: /stereo/left/image_raw_color, cam1_topic: /stereo/right/image_raw_color -->
+	<!-- <node name="stereo_split" pkg="dsvo" type="stereo_split" args="CHANGE:0"/> -->
+
+	<!-- (optional) load parameters; otherwise, change them in dynamic_reconfigure-->
+	<!-- <node name="dynamic_reconfigure_load" pkg="dynamic_reconfigure" type="dynparam" args="load CHANGE:/path/to/parameters/files/yaml" /> -->
+</launch>

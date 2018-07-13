@@ -18,8 +18,8 @@ void StereoProcessor::updateConfig(dsvo::dsvoConfig &config, uint32_t level) {
 	BA_MAX_STEP = config.BA_MAX_STEP;
 	SCALE_PYMD = config.SCALE_PYMD;
 	SCALE_MAX_STEP = config.SCALE_MAX_STEP;
-	LOOP_CLOSURE = config.LOOP_CLOSURE;
-	REFINE_PIXEL = config.REFINE_PIXEL;
+	// LOOP_CLOSURE = config.LOOP_CLOSURE;
+	// REFINE_PIXEL = config.REFINE_PIXEL;
 	DEBUG = config.DEBUG;
 	TEST_STEREO = config.TEST_STEREO;
 
@@ -57,12 +57,12 @@ StereoProcessor::StereoProcessor() {
 	cam0_E = cam0_E.reshape(0,4);
 	cv::Mat R0(cam0_E, cv::Rect(0,0,3,3));
 	cv::Mat t0 = cam0_E(cv::Rect(3,0,1,3));
-	camera0.K = cv::Mat::zeros(3,3,CV_64F);
-	camera0.K.at<double>(0,0) = K0[0];
-	camera0.K.at<double>(1,1) = K0[1];
-	camera0.K.at<double>(0,2) = K0[2];
-	camera0.K.at<double>(1,2) = K0[3];
-	camera0.K.at<double>(2,2) = 1.0;
+	cam0.K = cv::Mat::zeros(3,3,CV_64F);
+	cam0.K.at<double>(0,0) = K0[0];
+	cam0.K.at<double>(1,1) = K0[1];
+	cam0.K.at<double>(0,2) = K0[2];
+	cam0.K.at<double>(1,2) = K0[3];
+	cam0.K.at<double>(2,2) = 1.0;
 	cv::Size cam0_frame_size = cv::Size(frame_size0[0], frame_size0[1]);
 
 	// cam1
@@ -70,12 +70,12 @@ StereoProcessor::StereoProcessor() {
 	cam1_E = cam1_E.reshape(0,4);
 	cv::Mat R1 = cam1_E(cv::Rect(0,0,3,3));
 	cv::Mat t1 = cam1_E(cv::Rect(3,0,1,3));
-	camera1.K = cv::Mat::zeros(3,3,CV_64F);
-	camera1.K.at<double>(0,0) = K1[0];
-	camera1.K.at<double>(1,1) = K1[1];
-	camera1.K.at<double>(0,2) = K1[2];
-	camera1.K.at<double>(1,2) = K1[3];
-	camera1.K.at<double>(2,2) = 1.0;
+	cam1.K = cv::Mat::zeros(3,3,CV_64F);
+	cam1.K.at<double>(0,0) = K1[0];
+	cam1.K.at<double>(1,1) = K1[1];
+	cam1.K.at<double>(0,2) = K1[2];
+	cam1.K.at<double>(1,2) = K1[3];
+	cam1.K.at<double>(2,2) = 1.0;
 	cv::Size cam1_frame_size = cv::Size(frame_size1[0], frame_size1[1]);
 
 	/***********************stereo rectify begin***********************/
@@ -85,11 +85,9 @@ StereoProcessor::StereoProcessor() {
 	stereo0.R = R1T * R0;
 	stereo0.t = R1T * (t0 - t1);
 	cv::Size frame_size = cam0_frame_size;
-	bool cvt2VGA = false;
-	nhPriv.getParam("cvt2VGA", cvt2VGA);
-  if(cvt2VGA) frame_size = cv::Size(640,480);
+	bool cvt2VGA = false; if(nhPriv.getParam("cvt2VGA", cvt2VGA) && cvt2VGA) frame_size = cv::Size(640,480);
   cv::Mat rect_R0, rect_R1, rect_P0, rect_P1, Q;
-  cv::stereoRectify(camera0.K, dist_coeff0, camera1.K, dist_coeff1,cam0_frame_size, stereo0.R, stereo0.t, rect_R0, rect_R1, rect_P0, rect_P1, Q, cv::CALIB_ZERO_DISPARITY, 0, frame_size);
+  cv::stereoRectify(cam0.K, dist_coeff0, cam1.K, dist_coeff1,cam0_frame_size, stereo0.R, stereo0.t, rect_R0, rect_R1, rect_P0, rect_P1, Q, cv::CALIB_ZERO_DISPARITY, 0, frame_size);
 
   // modify external matrix by rect rotation
 	cv::Mat rR0T, rR1T;
@@ -99,33 +97,33 @@ StereoProcessor::StereoProcessor() {
   R1 = R1 * rR1T;
 	for(int i=0; i<3; i++) {
 		for(int j=0; j<3; j++) {
-			camera0.R_C2B(i,j) = R0.at<double>(i,j);
-			camera1.R_C2B(i,j) = R1.at<double>(i,j);
+			cam0.R_C2B(i,j) = R0.at<double>(i,j);
+			cam1.R_C2B(i,j) = R1.at<double>(i,j);
 		}
-		camera0.t_C2B(i) = t0.at<double>(i,0);
-		camera1.t_C2B(i) = t1.at<double>(i,0);
+		cam0.t_C2B(i) = t0.at<double>(i,0);
+		cam1.t_C2B(i) = t1.at<double>(i,0);
 	}
-	camera0.R_B2C = camera0.R_C2B.transpose();
-	camera0.t_B2C = - camera0.R_B2C * camera0.t_C2B;
-	camera1.R_B2C = camera1.R_C2B.transpose();
-	camera1.t_B2C = - camera1.R_B2C * camera1.t_C2B;
+	cam0.R_B2C = cam0.R_C2B.transpose();
+	cam0.t_B2C = - cam0.R_B2C * cam0.t_C2B;
+	cam1.R_B2C = cam1.R_C2B.transpose();
+	cam1.t_B2C = - cam1.R_B2C * cam1.t_C2B;
 
   cv::Mat tmp = rect_P0(cv::Rect(0,0,3,3));
-  tmp.copyTo(camera0.K);
+  tmp.copyTo(cam0.K);
   tmp = rect_P1(cv::Rect(0,0,3,3));
-  tmp.copyTo(camera1.K);
+  tmp.copyTo(cam1.K);
 
 	stereo0.R = cv::Mat::eye(3,3,CV_64F);
 	tmp = rect_P1(cv::Rect(3,0,1,3));
 	tmp.copyTo(stereo0.t);
-	stereo0.t = stereo0.t / camera0.K.at<double>(0,0);
+	stereo0.t = stereo0.t / cam0.K.at<double>(0,0);
 
 	StereoModel stereo1;
 	stereo1.R = stereo0.R;
 	stereo1.t = -stereo0.t;
 
-	camera1.stereo = stereo0;
-	camera0.stereo = stereo1;
+	cam1.stereo = stereo0;
+	cam0.stereo = stereo1;
 	/***********************stereo rectify end***********************/
 
 	// subscribe to rect_img topics
@@ -142,6 +140,8 @@ StereoProcessor::StereoProcessor() {
   	server.setCallback(f);
 
   param_changed = true;
+
+	// std::thread thread_featureTrack(&StereoProcessor::featureTrack, this);
 }
 
 void StereoProcessor::imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, const sensor_msgs::ImageConstPtr& img1_cptr) {
@@ -195,7 +195,7 @@ void StereoProcessor::detectFeatures(const cv::Mat& img, std::vector<cv::KeyPoin
   }
 }
 
-void StereoProcessor::triangulateByStereoMatch(KeyFrame& keyframe, const CameraModel& cam) {
+void StereoProcessor::triangulateByStereoMatch(KeyFrame& keyframe) {
 	float MAX_DISP = 50.0;
 	std::clock_t triangulateByStereoMatch_start = std::clock();
 	// find stereo match by row matching
@@ -261,10 +261,10 @@ void StereoProcessor::triangulateByStereoMatch(KeyFrame& keyframe, const CameraM
 	std::vector<float> err;
 	cv::calcOpticalFlowPyrLK(keyframe.img0, keyframe.img1, kp0_in, kp1_in, status, err);
 
-  float f = cam.K.at<double>(0,0);
-  float cx = cam.K.at<double>(0,2);
-  float cy = cam.K.at<double>(1,2);
-  float B = cam.stereo.t.at<double>(0,0);
+  float f = cam0.K.at<double>(0,0);
+  float cx = cam0.K.at<double>(0,2);
+  float cy = cam0.K.at<double>(1,2);
+  float B = cam0.stereo.t.at<double>(0,0);
   float fB = f*B;
   for(int i=0; i<status.size(); i++) {
 		if(!status[i]) continue;
@@ -282,8 +282,7 @@ void StereoProcessor::triangulateByStereoMatch(KeyFrame& keyframe, const CameraM
 	// std::cout << "triangulateByStereoMatch: " << (std::clock() - triangulateByStereoMatch_start) / (double)(CLOCKS_PER_SEC / 1000) << " ms" << std::endl;
 }
 
-KeyFrame StereoProcessor::createKeyFrame(const Pose& cur_pose, const cv::Mat& cur_img0, const cv::Mat& cur_img1, const CameraModel& cam0,
-												                 const FeaturePoints& feature_points, const std::vector<bool>& new_pts_flags){
+KeyFrame StereoProcessor::createKeyFrame(const Pose& cur_pose, const FeaturePoints& feature_points, const std::vector<bool>& new_pts_flags){
 	KeyFrame keyframe = KeyFrame();
 	keyframe.pose = cur_pose;
 	keyframe.time = cur_time;
@@ -291,7 +290,7 @@ KeyFrame StereoProcessor::createKeyFrame(const Pose& cur_pose, const cv::Mat& cu
 	keyframe.img1 = cur_img1.clone();
 	if(feature_points.empty()) { // use stereo match to triangulate points if necessary
 		if(DEBUG) std::cout<<"triangulateByStereoMatch"<<std::endl;
-		triangulateByStereoMatch(keyframe, cam0);
+		triangulateByStereoMatch(keyframe);
 	} else {
 	  keyframe.feature_points = feature_points;
 	}

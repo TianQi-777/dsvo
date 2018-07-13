@@ -12,8 +12,8 @@
 #include <opencv2/plot.hpp>
 #include "data.hpp"
 
-#define BATCH_SIZE 5
-#define KLT_BATCH_SIZE 11
+#define BATCH_SIZE 1
+// #define KLT_BATCH_SIZE 11
 
 namespace helper {
 

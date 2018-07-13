@@ -1,8 +1,4 @@
 Tasks:
-  zed ground truth
-
-  mh.yaml for grass
-
   optimize optimizers
 
   optimize debug mode
@@ -10,9 +6,3 @@ Tasks:
   nodelet multithread
 
   2 cameras fusing
-
-
-Notes:
-  rosparam set use_sim_time true
-  rosbag play --clock sptam.bag -s 90 -u 30
-  roslaunch sptam euroc.launch
