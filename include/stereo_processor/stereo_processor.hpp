@@ -19,6 +19,7 @@
 #include <string>
 #include <ctime>
 #include <cmath>
+#include <thread>
 #include <queue>
 #include <chrono>
 
@@ -31,6 +32,8 @@
 // #include "klt.hpp"
 #include "scale_optimizer.hpp"
 // #include "local_KF_optimizer.hpp"
+
+#define MULTI_THREAD false
 
 typedef pcl::PointCloud<pcl::PointXYZI> PointCloud;
 
@@ -110,7 +113,7 @@ private:
 	void track(const cv::Mat& _cur_img0, const cv::Mat& _cur_img1, double _cur_time);
 	void monoTrack();
  	bool propagateState();
- 	void featureTrack();
+ 	void featureTrack(const cv::Mat& cur_img);
 	bool reconstructAndOptimize(KFData& kf_data, Pose& cur_pose, FeaturePoints& curKF_fts_pts, std::vector<bool>& curKF_new_pts_flags);
 
   // helper functions
@@ -119,13 +122,15 @@ private:
 	void detectFeatures(const cv::Mat& img, std::vector<cv::KeyPoint>& kps, int fts_per_cell);
 	void triangulateByStereoMatch(KeyFrame& keyframe);
 
-	// // frames to be featureTrack
-	// std::queue<cv::Mat> featureFrameQueue;
-	// std::thread thread_featureTrack;
-	// void featureTrackThread();
+	// frames to be featureTrack
+	bool thread_featureTrack_running;
+	std::queue<cv::Mat> featureFrameQueue;
+	std::thread thread_featureTrack;
+	void featureTrackThread();
 
 public:
 	StereoProcessor();
+	~StereoProcessor();
 
 	void updateConfig(dsvo::dsvoConfig &config, uint32_t level);
 

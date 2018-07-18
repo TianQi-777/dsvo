@@ -13,16 +13,16 @@ t_pts = tt(tt(:,1)==131,2:3);  % points reconstruction
 t_scale = tt(tt(:,1)==132,2:3);  % scale opt time
 pts = tt(tt(:,4)>=0, [2,4]);
 
-fprintf('\nAve. time for [%d] stereo match = %f\n', size(t_stereo,1), mean(t_stereo(:,2)));
-fprintf('Ave. time for [%d] normal frame = %f\n', size(t_normal,1), mean(t_normal(:,2)));
-fprintf('Ave. time for [%d] DSVO Keyframe = %f\n', size(t_dsvo,1), mean(t_dsvo(:,2)));
-fprintf('Ave. time for [%d] frame = %f\n', size(t_f,1), mean(t_f(:,2)));
 fprintf('Ave. feature tracking time = %f\n', mean(t_feature(:,2)));
 fprintf('Ave. pose propagation(direct) time = %f\n', mean(t_prap_dir(:,2)));
 fprintf('Ave. pose propagation(refine by OF) time = %f\n', mean(t_prap_rfof(:,2)));
 fprintf('Ave. points reconstruction time = %f\n', mean(t_pts(:,2)));
 fprintf('Ave. scale optimization time = %f\n', mean(t_scale(:,2)));
 fprintf('Ave. # of points = %f\n', mean(pts(:,2)));
+fprintf('\nAve. time for [%d] stereo match = %f\n', size(t_stereo,1), mean(t_stereo(:,2)));
+fprintf('Ave. time for [%d] normal frame = %f\n', size(t_normal,1), mean(t_normal(:,2)));
+fprintf('Ave. time for [%d] DSVO Keyframe = %f\n', size(t_dsvo,1), mean(t_dsvo(:,2)));
+fprintf('Ave. time for [%d] frame = %f\n', size(t_f,1), mean(t_f(:,2)));
 
 % figure('Name','Points')
 % plot(pts(:,1), pts(:,2), 'b-');

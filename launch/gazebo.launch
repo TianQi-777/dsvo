@@ -1,7 +1,8 @@
 <launch>
+  <!-- <include file="$(find dsvo)/test/gazebo/sim.launch"/> -->
 
-	<rosparam command="load" file="$(env HOME)/workspace/data/cams/zed/cam0.yaml" ns="/cam0"/>
-	<rosparam command="load" file="$(env HOME)/workspace/data/cams/zed/cam1.yaml" ns="/cam1"/>
+	<rosparam command="load" file="$(env HOME)/workspace/data/cams/gazebo/cam0.yaml" ns="/cam0"/>
+	<rosparam command="load" file="$(env HOME)/workspace/data/cams/gazebo/cam1.yaml" ns="/cam1"/>
 
 	<node name="stereo_rectifier_node" pkg="dsvo" type="stereo_rectifier_node">
 		<param name="cam0_topic" value="/stereo/left/image_raw_color" />

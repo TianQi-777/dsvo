@@ -8,7 +8,7 @@ dir = '~/.ros';
 % dir = '/home/jiawei/Dropbox/results/mh1/sptam';
 gt_a = load(strcat(dir,'/truth.txt'));
 vo = load(strcat(dir,'/vo.txt'));
-vo(:,1) = vo(:,1) + 0.15;
+% vo(:,1) = vo(:,1) + 0.15;
 % gt_a = gt_a(1:end-80, :);
 % vo = vo(1:end-80, :);
 % gt_a = gt_a(15:end, :);
@@ -65,7 +65,7 @@ step = floor(length(vo) / (vo(end,1)-vo(1,1))); % step of 1 sec
 
 % calculate vo translation
 for i=1+step:size(vo,1)
-    vo(i, 6:8) = (vo(i, 3:5) - vo(i-step, 3:5));
+    vo(i, 6:8) = (vo(i, 3:5) - vo(i-step, 3:5)) / (vo(i, 1) - vo(i-step, 1));
 end
 vo = vo(1+step:end, :);
 di = vo(:,2)==0;
@@ -73,7 +73,7 @@ si = vo(:,2)==1;
 
 % calculate gt translation
 for i=1+step:size(gt,1)
-    gt(i, 5:7) = (gt(i, 2:4) - gt(i-step, 2:4));
+    gt(i, 5:7) = (gt(i, 2:4) - gt(i-step, 2:4)) / (gt(i, 1) - gt(i-step, 1));
 end
 gt = gt(1+step:end, :);
 
@@ -102,11 +102,10 @@ diffn_s = diffn(si);
 fprintf('RMSE offset of scale (DSVO, Stereo, Overall) = (%f, %f, %f)\n', ...
     sqrt(diffn_d' * diffn_d / length(diffn_d)), sqrt(diffn_s' * diffn_s / length(diffn_s)), sqrt(diffn' * diffn / length(diffn)));
 fprintf('Median offset of scale (DSVO, Stereo, Overall) = (%f, %f, %f)\n', median(diffn_d), median(diffn_s), median(diffn));
-fprintf('Average offset percentage of scale (DSVO, Stereo, Overall) = (%f, %f, %f)\n', ...
-    mean(diffn_d ./ gtvn(di)), mean(diffn_s ./ gtvn(si)), mean(diffn ./ gtvn));
+
 
 figure('Name','Velocity Scale')
-subplot(3,1,1);
+subplot(2,1,1);
 plot(gt(:,1), gtvn, 'g.');
 hold on
 plot(vo(di,1), vovn(di), 'r.');
@@ -114,20 +113,12 @@ hold on
 plot(vo(si,1), vovn(si), 'b.');
 legend('Truth', 'Estimated by DSVO', 'Estimated by Stereo Match');
 xlabel('Time s'); ylabel('Velocity m/s');
-subplot(3,1,2);
+subplot(2,1,2);
 plot(vo(di,1), diffn(di), 'r.');
 hold on 
 plot(vo(si,1), diffn(si), 'b.');
 legend('DSVO', 'Stereo Match');
 xlabel('Time s'); ylabel('Velocity Error m/s');
-subplot(3,1,3);
-plot([0:length(sort(diffn_d))-1]/length(sort(diffn_d)), sort(diffn_d));
-hold on
-strmedian = ['\leftarrow Median = ',num2str(median(diffn_d))];
-plot(0.5, median(diffn_d), 'r*');
-text(0.52, median(diffn_d), strmedian);
-title('Velocity Error Sorted, Estimated by DSVO');
-xlabel('Percentage'); ylabel('Velocity Error m/s');
 
 % % velocity orientation
 % gtvd = gt(:,5:7) ./ gtvn;

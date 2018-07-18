@@ -3,6 +3,4 @@ Tasks:
 
   optimize debug mode
 
-  nodelet multithread
-
-  2 cameras fusing
+  orientation test

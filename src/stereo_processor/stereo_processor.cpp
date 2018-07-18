@@ -1,5 +1,6 @@
 #include "stereo_processor/stereo_processor.hpp"
 #include <thread>
+#define PROP_DEBUG true
 
 void StereoProcessor::track(const cv::Mat& _cur_img0, const cv::Mat& _cur_img1, double _cur_time) {
 	cur_time = _cur_time;
@@ -55,8 +56,10 @@ void StereoProcessor::monoTrack() {
   lastKF = &keyframes.back();
 
 	// feature tracking for new points of new KeyFrame
-	if(!TEST_STEREO) featureTrack();
-	// featureFrameQueue.push(cur_img0);
+	if(!TEST_STEREO) {
+		if(!MULTI_THREAD) featureTrack(cur_img0);
+		else featureFrameQueue.push(cur_img0);
+	}
 
 	// propagate current state using existing feature points
 	if(!propagateState()) return;
@@ -75,6 +78,11 @@ void StereoProcessor::monoTrack() {
 	// create new KeyFrame after moving enough distance
 	if (t_lastKF2Cur.norm()>KF_DIST)
 	{
+		if(MULTI_THREAD) {
+			while(!featureFrameQueue.empty()) {
+					std::this_thread::sleep_for (std::chrono::nanoseconds(1));
+			}
+		}
 		std::clock_t kf_start = std::clock();
 
 		if(TEST_STEREO) {
@@ -125,20 +133,21 @@ void StereoProcessor::monoTrack() {
 	cv::waitKey(1);
 }
 
-// void StereoProcessor::featureTrackThread() {
-// 	while(true) {
-// 		if(!featureFrameQueue.empty()) {
-// 			cv::Mat& cur_img = featureFrameQueue.front();
-// 			std::vector<cv::Point2f> cur_features;
-// 			featureTrack(lastKF, last_frame, cur_img, cur_features);
-// 			featureFrameQueue.pop();
-// 		} else {
-// 			std::this_thread::sleep_for (std::chrono::milliseconds(5));
-// 		}
-// 	}
-// }
+void StereoProcessor::featureTrackThread() {
+	while(true) {
+		if(!thread_featureTrack_running) break;
+		if(!featureFrameQueue.empty()) {
+			cv::Mat& cur_img = featureFrameQueue.front();
+			std::vector<cv::Point2f> cur_features;
+			featureTrack(cur_img);
+			featureFrameQueue.pop();
+		} else {
+			std::this_thread::sleep_for (std::chrono::milliseconds(1));
+		}
+	}
+}
 
-void StereoProcessor::featureTrack() {
+void StereoProcessor::featureTrack(const cv::Mat& cur_img) {
 	if(last_frame.features.empty()) return;
 
 	std::clock_t start = std::clock();
@@ -147,12 +156,12 @@ void StereoProcessor::featureTrack() {
   std::vector<cv::Point2f> last_frame_features_back, lastKF_features_inlier, last_frame_features_inlier, cur_features, cur_features_inlier;
   std::vector<uchar> status, status_back;
   std::vector<float> err, err_back;
-  cv::calcOpticalFlowPyrLK(last_frame.img, cur_img0, last_frame.features, cur_features, status, err, cv::Size(OF_size,OF_size), FEATURE_OF_PYMD-1);
-  cv::calcOpticalFlowPyrLK(cur_img0, last_frame.img, cur_features, last_frame_features_back, status_back, err_back, cv::Size(OF_size,OF_size), FEATURE_OF_PYMD-1);
+  cv::calcOpticalFlowPyrLK(last_frame.img, cur_img, last_frame.features, cur_features, status, err, cv::Size(OF_size,OF_size), FEATURE_OF_PYMD-1);
+  cv::calcOpticalFlowPyrLK(cur_img, last_frame.img, cur_features, last_frame_features_back, status_back, err_back, cv::Size(OF_size,OF_size), FEATURE_OF_PYMD-1);
 
 	// remove outliers
 	cv::Mat line_img;
-	cv::vconcat(lastKF->img0, cur_img0, line_img);
+	cv::vconcat(lastKF->img0, cur_img, line_img);
   for(int i=0; i<status.size(); i++){
 		// remove outlier by forward-backward matching
   	if(!status[i] || !status_back[i] || cv::norm(last_frame.features[i]-last_frame_features_back[i]) > 1) continue;
@@ -168,7 +177,7 @@ void StereoProcessor::featureTrack() {
 
   lastKF->new_features = lastKF_features_inlier;
 	last_frame.features = cur_features_inlier;
-	time_ofs << "11 " << cur_time-init_time << " " << (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " -1" << std::endl;
+	if(!MULTI_THREAD) time_ofs << "11 " << cur_time-init_time << " " << (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " -1" << std::endl;
 }
 
 bool StereoProcessor::propagateState() {
@@ -240,7 +249,7 @@ bool StereoProcessor::propagateState() {
 	last_frame.feature_points.clear();
 	cv::Mat prop_img;
 	int marker_size = prop_img.rows / 50;
-	if(DEBUG) {
+	if(PROP_DEBUG) {
 		prop_img = cur_img0.clone();
 	  cv::cvtColor(prop_img, prop_img, cv::COLOR_GRAY2BGR);
 	}
@@ -251,7 +260,7 @@ bool StereoProcessor::propagateState() {
 		cv::Mat pm = cam0.K*new_p_m;
 		cv::Point2f proj = cv::Point2f(pm.at<double>(0) / pm.at<double>(2),pm.at<double>(1) / pm.at<double>(2));
 		cv::Point2f& f = cur_features_refined_inlier[i];	// current feature position refined by optical flow
-		if(DEBUG) {
+		if(PROP_DEBUG) {
 			cv::circle(prop_img, f, 3, cv::Scalar(0,255,0));
 			cv::line(prop_img, f, proj, cv::Scalar(0,255,255));
 		}
@@ -261,15 +270,15 @@ bool StereoProcessor::propagateState() {
 		if(reproj_err<PROP_PROJ_DIST) {
 			lastKF->feature_points.push_back(lastKF_features_inlier[i], lastKF_points_inlier[i].point, reproj_err);		//TODO
 			last_frame.feature_points.push_back(f, cv::Point3f(new_p_m), reproj_err);
-			if(DEBUG) cv::drawMarker(prop_img, proj, marker_color, cv::MARKER_CROSS, marker_size);
+			if(PROP_DEBUG) cv::drawMarker(prop_img, proj, marker_color, cv::MARKER_CROSS, marker_size);
 		}
 		else {
-			if(DEBUG) cv::circle(prop_img, proj, 4, cv::Scalar(0,0,255));
+			if(PROP_DEBUG) cv::circle(prop_img, proj, 4, cv::Scalar(0,0,255));
 		}
 	}
 
 	if(DEBUG) std::cout<<"propagateState ratio "<<lastKF->feature_points.size()<<" / "<<lastKF_points_inlier.size()<<std::endl;
-	if(DEBUG) cv::imshow("propagate projection", prop_img);
+	if(PROP_DEBUG) cv::imshow("propagate projection", prop_img);
 
 	if(float(lastKF->feature_points.size()) / lastKF_points_inlier.size() < PROP_PTS_RATIO){
 		std::cout<<"propagateState ratio too low: "<<float(lastKF->feature_points.size()) / lastKF_points_inlier.size()<<std::endl;

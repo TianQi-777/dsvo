@@ -1,6 +1,6 @@
 <launch>
 
-	<node name="stereo_split" pkg="dsvo" type="stereo_split" args="0"/>
+	<node name="stereo_split" pkg="dsvo" type="stereo_split" args="1"/>
 
 	<rosparam command="load" file="$(env HOME)/workspace/data/cams/zed/cam0.yaml" ns="/cam0"/>
 	<rosparam command="load" file="$(env HOME)/workspace/data/cams/zed/cam1.yaml" ns="/cam1"/>

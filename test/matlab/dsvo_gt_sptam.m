@@ -6,8 +6,8 @@ gt = load(strcat(dir,'/truth.txt'));
 dsvo = load(strcat(dir,'/vo.txt'));
 dsvo = dsvo(:, [1,3,4,5]);
 sptam = load(strcat(dir,'/sptam.txt'));
-dsvo(:,1) = dsvo(:,1) + 0.15;
-sptam(:,1) = sptam(:,1) + 0.15;
+% dsvo(:,1) = dsvo(:,1) + 0.15;
+% sptam(:,1) = sptam(:,1) + 0.15;
 % gt = gt(500:end, :); dsvo = dsvo(500:end, :); sptam = sptam(500:end, :);
 i = 1; % index of gt
 while(gt(i,1) < dsvo(1,1) || gt(i,1) < sptam(1,1))
@@ -18,20 +18,14 @@ gt = gt(i:end, :);
 disp('DSVO')
 [gtp, dsvop, gtt, dsvot, gtvn, dsvovn] = alignGT(gt, dsvo);
 dsvo_diffn = abs(gtvn - dsvovn);
-dsvo_pern = dsvo_diffn ./ gtvn;
-dsvo_pern = sum(dsvo_pern) / length(dsvo_pern);
 fprintf('RMSE offset of scale = %f\n', sqrt(dsvo_diffn' * dsvo_diffn / size(dsvo_diffn,1)));
 fprintf('Median offset of scale = %f\n', median(dsvo_diffn));
-fprintf('Average offset percentage of scale = %f\n', dsvo_pern);
 
 disp('S-PTAM')
 [~, sptamp, ~, sptamt, gtvn, sptamvn] = alignGT(gt, sptam);
 sptam_diffn = abs(gtvn - sptamvn);
-sptam_pern = sptam_diffn ./ gtvn;
-sptam_pern = sum(sptam_pern) / length(sptam_pern);
 fprintf('RMSE offset of scale = %f\n', sqrt(sptam_diffn' * sptam_diffn / size(sptam_diffn,1)));
 fprintf('Median offset of scale = %f\n', median(sptam_diffn));
-fprintf('Average offset percentage of scale = %f\n', sptam_pern);
 
 
 figure('Name','Trajectory')
@@ -41,10 +35,11 @@ plot3(dsvop(:,1), dsvop(:,2), dsvop(:,3), 'g-')
 hold on
 plot3(sptamp(:,1), sptamp(:,2), sptamp(:,3), 'b-')
 legend('Truth', 'DSVO', 'SPTAM');
+axis equal
 title('Trajectory')
 
 figure('Name','Velocity Scale')
-subplot(3,1,1);
+subplot(2,1,1);
 plot(gtt, gtvn, 'r-');
 hold on
 plot(dsvot, dsvovn, 'g-');
@@ -52,23 +47,23 @@ hold on
 plot(sptamt, sptamvn, 'b-');
 ylim([0 min(5,max(max(dsvovn), max(sptamvn))+0.1)]);
 legend('Truth', 'DSVO', 'SPTAM');
-title('Scale per second');
-subplot(3,1,2);
-plot(dsvot, dsvo_diffn, 'g');
+xlabel('Time s'); ylabel('Velocity m/s');
+subplot(2,1,2);
+plot(dsvot, dsvo_diffn, 'g.');
 hold on
-plot(sptamt, sptam_diffn, 'b');
+plot(sptamt, sptam_diffn, 'b.');
 legend('DSVO', 'SPTAM');
-title('Absolute scale error');
-subplot(3,1,3);
-dsvo_sortn = sort(dsvo_diffn);
-sptam_sortn = sort(sptam_diffn);
-plot(dsvo_sortn, 'g');
-hold on
-plot(sptam_sortn, 'b');
-legend('DSVO', 'SPTAM');
-title('Sorted absolute scale error');
-perct = dsvo_sortn(floor(0.95*length(dsvo_sortn)));
-ylim([0 perct]);
+xlabel('Time s'); ylabel('Velocity Error m/s');
+% subplot(3,1,3);
+% dsvo_sortn = sort(dsvo_diffn);
+% sptam_sortn = sort(sptam_diffn);
+% plot(dsvo_sortn, 'g');
+% hold on
+% plot(sptam_sortn, 'b');
+% legend('DSVO', 'SPTAM');
+% title('Sorted absolute scale error');
+% perct = dsvo_sortn(floor(0.95*length(dsvo_sortn)));
+% ylim([0 perct]);
 
 function [gtp, vop, gtt, vot, gtvn, vovn] = alignGT(gt, vo)
 % get overlap of gt with vo
@@ -122,17 +117,18 @@ for i=size(gt,1):-1:1
 end
 
 %% plot results
+step = 1; % step of 1 sec
 step = floor(length(vo) / (vo(end,1)-vo(1,1))); % step of 1 sec
 
 % calculate vo translation
 for i=1+step:size(vo,1)
-    vo(i, 5:7) = (vo(i, 2:4) - vo(i-step, 2:4));
+    vo(i, 5:7) = (vo(i, 2:4) - vo(i-step, 2:4)) / (vo(i, 1) - vo(i-step, 1));
 end
 vo = vo(1+step:end, :);
 
 % calculate gt translation
 for i=1+step:size(gt,1)
-    gt(i, 5:7) = (gt(i, 2:4) - gt(i-step, 2:4));
+    gt(i, 5:7) = (gt(i, 2:4) - gt(i-step, 2:4)) / (gt(i, 1) - gt(i-step, 1));
 end
 gt = gt(1+step:end, :);
  

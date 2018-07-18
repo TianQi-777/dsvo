@@ -3,7 +3,7 @@ close all
 
 % dir = '~/Dropbox/results/grass_circle';
 dir = '~/Dropbox/results/grass_square';
-% dir = '~/.ros';
+dir = '~/.ros';
 
 figure
 dsvo = load(strcat(dir,'/vo.txt'));

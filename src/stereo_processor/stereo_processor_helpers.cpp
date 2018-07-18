@@ -141,7 +141,16 @@ StereoProcessor::StereoProcessor() {
 
   param_changed = true;
 
-	// std::thread thread_featureTrack(&StereoProcessor::featureTrack, this);
+	if(MULTI_THREAD) {
+		thread_featureTrack_running = true;
+		thread_featureTrack = std::thread(&StereoProcessor::featureTrackThread, this);
+	}
+}
+StereoProcessor::~StereoProcessor() {
+	if(MULTI_THREAD) {
+		thread_featureTrack_running = false;
+		thread_featureTrack.join();
+	}
 }
 
 void StereoProcessor::imageMessageCallback(const sensor_msgs::ImageConstPtr& img0_cptr, const sensor_msgs::ImageConstPtr& img1_cptr) {
@@ -196,7 +205,7 @@ void StereoProcessor::detectFeatures(const cv::Mat& img, std::vector<cv::KeyPoin
 }
 
 void StereoProcessor::triangulateByStereoMatch(KeyFrame& keyframe) {
-	float MAX_DISP = 50.0;
+	float MAX_DISP = 5000.0;
 	std::clock_t triangulateByStereoMatch_start = std::clock();
 	// find stereo match by row matching
 	std::vector<cv::KeyPoint> kp0, kp1;
