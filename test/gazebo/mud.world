@@ -13,52 +13,6 @@
       </attenuation>
       <direction>-0.5 0.5 -1</direction>
     </light>
-    <model name='ground_plane'>
-      <link name='link'>
-        <collision name='collision'>
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>100 100</size>
-            </plane>
-          </geometry>
-          <surface>
-            <friction>
-              <ode>
-                <mu>100</mu>
-                <mu2>50</mu2>
-              </ode>
-              <torsional>
-                <ode/>
-              </torsional>
-            </friction>
-            <contact>
-              <ode/>
-            </contact>
-            <bounce/>
-          </surface>
-          <max_contacts>10</max_contacts>
-        </collision>
-        <visual name='visual'>
-          <cast_shadows>0</cast_shadows>
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>100 100</size>
-            </plane>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Grey</name>
-            </script>
-          </material>
-        </visual>
-        <self_collide>0</self_collide>
-        <kinematic>0</kinematic>
-        <gravity>1</gravity>
-      </link>
-    </model>
     <gravity>0 0 0</gravity>
     <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
     <atmosphere type='adiabatic'/>
@@ -79,13 +33,14 @@
       <elevation>0</elevation>
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
-    <model name='asphalt_plane'>
+    
+    <model name='mud_box'>
       <static>1</static>
       <link name='link'>
         <collision name='collision'>
           <geometry>
             <box>
-              <size>20 20 0.1</size>
+              <size>8 10 0.2</size>
             </box>
           </geometry>
           <max_contacts>10</max_contacts>
@@ -102,18 +57,67 @@
             </friction>
           </surface>
         </collision>
-        <visual name='visual'>
+        <visual name='visual_1'>
+          <pose frame=''>-2 2.5 0 0 -0 0</pose>
           <cast_shadows>0</cast_shadows>
           <geometry>
             <box>
-              <size>20 20 0.1</size>
+              <size>4 5 0.2</size>
             </box>
           </geometry>
           <material>
             <script>
-              <uri>model://asphalt_plane/materials/scripts</uri>
-              <uri>model://asphalt_plane/materials/textures</uri>
-              <name>vrc/asphalt</name>
+              <uri>model://mud_box/materials/scripts</uri>
+              <uri>model://mud_box/materials/textures</uri>
+              <name>vrc/mud</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='visual_2'>
+          <pose frame=''>2 2.5 0 0 -0 0</pose>
+          <cast_shadows>0</cast_shadows>
+          <geometry>
+            <box>
+              <size>4 5 0.2</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://mud_box/materials/scripts</uri>
+              <uri>model://mud_box/materials/textures</uri>
+              <name>vrc/mud</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='visual_3'>
+          <pose frame=''>2 -2.5 0 0 -0 0</pose>
+          <cast_shadows>0</cast_shadows>
+          <geometry>
+            <box>
+              <size>4 5 0.2</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://mud_box/materials/scripts</uri>
+              <uri>model://mud_box/materials/textures</uri>
+              <name>vrc/mud</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='visual_4'>
+          <pose frame=''>-2 -2.5 0 0 -0 0</pose>
+          <cast_shadows>0</cast_shadows>
+          <geometry>
+            <box>
+              <size>4 5 0.2</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://mud_box/materials/scripts</uri>
+              <uri>model://mud_box/materials/textures</uri>
+              <name>vrc/mud</name>
             </script>
           </material>
         </visual>
@@ -121,24 +125,14 @@
         <kinematic>0</kinematic>
         <gravity>1</gravity>
       </link>
-      <pose frame=''>-0.363036 0.563122 0 0 -0 0</pose>
+      <pose frame=''>-0.181742 0.152565 0 0 -0 0</pose>
     </model>
     <state world_name='default'>
-      <sim_time>304 33000000</sim_time>
-      <real_time>37 654741114</real_time>
-      <wall_time>1532463415 378359498</wall_time>
-      <iterations>37606</iterations>
-      <model name='asphalt_plane'>
-        <pose frame=''>0 0 0 0 -0 0</pose>
-        <scale>1 1 1</scale>
-        <link name='link'>
-          <pose frame=''>0 0 0 0 -0 0</pose>
-          <velocity>0 0 0 0 -0 0</velocity>
-          <acceleration>0 0 0 0 -0 0</acceleration>
-          <wrench>0 0 0 0 -0 0</wrench>
-        </link>
-      </model>
-      <model name='ground_plane'>
+      <sim_time>60 464000000</sim_time>
+      <real_time>60 801716240</real_time>
+      <wall_time>1532640735 582149877</wall_time>
+      <iterations>60464</iterations>
+      <model name='mud_box'>
         <pose frame=''>0 0 0 0 -0 0</pose>
         <scale>1 1 1</scale>
         <link name='link'>
@@ -152,9 +146,9 @@
         <pose frame=''>0 0 10 0 -0 0</pose>
       </light>
     </state>
-    <gui fullscreen='1'>
+    <gui fullscreen='0'>
       <camera name='user_camera'>
-        <pose frame=''>5 -5 2 0 0.275643 2.35619</pose>
+        <pose frame=''>18.7702 3.21913 32.9318 0 1.23564 -2.39899</pose>
         <view_controller>orbit</view_controller>
         <projection_type>perspective</projection_type>
       </camera>

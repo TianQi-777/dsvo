@@ -2,9 +2,6 @@
   <arg name="detector" default="orb"/>
   <arg name="descriptor" default="brief"/>
 
-  <!-- Set use_sim_time true for datasets-->
-  <param name="use_sim_time" value="true"/>
-
   <!-- Publish static transform between robot origin and left camera origin-->
 
   <node pkg="tf2_ros" type="static_transform_publisher" name="imu_cam0_broadcaster" args="0 0 0 0 0 0 imu4 cam0"/>
@@ -52,7 +49,7 @@
 
    <param name="use_prediction" value="false"/>
    <param name="publish_transform" value="true"/>
-   <param name="publish_on_fail" value="true"/>
+   <!-- <param name="publish_on_fail" value="true"/> -->
    <param name="base_frame" value="base_link"/>
 
    <param name="prediction_frame" value="map"/>

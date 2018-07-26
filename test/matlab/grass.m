@@ -23,12 +23,12 @@ zed = load(strcat(dir,'/truth.txt'));
 zed = alignZ(zed(:,2:4));
 subplot(2,3,2)
 plot3(zed(:,1), zed(:,2), zed(:,3), 'g.')
-title('ZED ODOM, XY')
+title('Truth, XY')
 view(0,90)
 axis equal
 subplot(2,3,5)
 plot3(zed(:,1), zed(:,2), zed(:,3), 'g.')
-title('ZED ODOM, XZ')
+title('Truth, XZ')
 view(0,0)
 axis equal
 

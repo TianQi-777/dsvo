@@ -29,11 +29,11 @@
         <noise>
           <type>gaussian</type>
           <mean>0.0</mean>
-          <stddev>0.03</stddev>
+          <stddev>0.01</stddev>
         </noise>
       </camera>
       <camera name="right">
-        <pose>0 -0.07 0 0 0 0</pose>
+        <pose>0 -0.12 0 0 0.0001 0</pose>
         <horizontal_fov>1.3962634</horizontal_fov>
         <image>
           <width>640</width>
@@ -47,7 +47,7 @@
         <noise>
           <type>gaussian</type>
           <mean>0.0</mean>
-          <stddev>0.03</stddev>
+          <stddev>0.01</stddev>
         </noise>
       </camera>
       <plugin name="stereo_camera_controller" filename="libgazebo_ros_multicamera.so">
@@ -57,7 +57,7 @@
         <imageTopicName>image_raw_color</imageTopicName>
         <cameraInfoTopicName>camera_info</cameraInfoTopicName>
         <frameName>camera_link</frameName>
-        <hackBaseline>0.07</hackBaseline>
+        <hackBaseline>0.12</hackBaseline>
         <distortionK1>0.0</distortionK1>
         <distortionK2>0.0</distortionK2>
         <distortionK3>0.0</distortionK3>

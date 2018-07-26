@@ -21,7 +21,9 @@ catkin_make
 ```
 
 # Usage
-Follow [sample.launch](https://github.umn.edu/moxxx066/dsvo/blob/VO_loop/launch/sample.launch)
+Calibrate cameras using [kalibr](https://github.com/ethz-asl/kalibr/wiki/multiple-camera-calibration)
+
+Follow [sample.launch](https://github.umn.edu/moxxx066/dsvo/blob/master/launch/sample.launch)
 
 # Published Topics
 /cam_pose (geometry_msgs/PoseWithCovarianceStamped)
@@ -31,7 +33,7 @@ Follow [sample.launch](https://github.umn.edu/moxxx066/dsvo/blob/VO_loop/launch/
 # Output files under .ros
 vo.txt: generated odometry (time 0:dsvo;stereo_match x y z)
 
-time.txt: computational time consumption, check [time_format.txt](https://github.umn.edu/moxxx066/dsvo/blob/VO_loop/test/time_format.txt) for details
+time.txt: computational time consumption, check [time_format.txt](https://github.umn.edu/moxxx066/dsvo/blob/master/test/time_format.txt) for details
 
 # Parameters
 BLUR_SZ: blur size

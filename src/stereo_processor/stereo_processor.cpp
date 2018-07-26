@@ -1,6 +1,6 @@
 #include "stereo_processor/stereo_processor.hpp"
 #include <thread>
-#define PROP_DEBUG true
+#define PROP_DEBUG false
 
 void StereoProcessor::track(const cv::Mat& _cur_img0, const cv::Mat& _cur_img1, double _cur_time) {
 	cur_time = _cur_time;
