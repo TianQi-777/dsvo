@@ -28,10 +28,17 @@ vo = vo_n(idx, :);
 gt = gt(idx, :);
 
 %% align two set of points
-cg = mean(gt(:,2:4));
-cv = mean(vo(:,2:4));
+% cg = mean(gt(:,2:4));
+% cv = mean(vo(:,2:4));
+cg = gt(1,2:4);
+cv = vo(1,2:4);
 H = zeros(3,3);
-for i=1:length(gt)
+% ali_length = length(gt);
+ali_length = 1;
+while gt(ali_length,1)-gt(1,1)<5
+    ali_length = ali_length + 1;
+end
+for i=1:ali_length
     H = H + (gt(i,2:4)-cg)'*(vo(i,2:4)-cv);
 end
 [U,~,V] = svd(H);
@@ -40,8 +47,10 @@ for i=1:size(vo,1)
     p = R*vo(i,2:4)';
     vo(i,2:4) = p';
 end
-cg = mean(gt(:,2:4));
-cv = mean(vo(:,2:4));
+% cg = mean(gt(:,2:4));
+% cv = mean(vo(:,2:4));
+cg = gt(1,2:4);
+cv = vo(1,2:4);
 for i=size(vo,1):-1:1
     vo(i,2:4) = vo(i,2:4) - cv;
 end
@@ -50,7 +59,7 @@ for i=size(gt,1):-1:1
 end
 
 %% results
-step = 1; % step of 1 sec
+step = 1; 
 step = floor(length(vo) / (vo(end,1)-vo(1,1))); % step of 1 sec
 
 % calculate vo translation

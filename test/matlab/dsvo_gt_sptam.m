@@ -11,7 +11,7 @@ dsvo = dsvo(:, [1,3,4,5]);
 sptam = load(strcat(dir,'/sptam.txt'));
 dsvo(:,1) = dsvo(:,1) + 0.15;
 sptam(:,1) = sptam(:,1) + 0.15;
-gt = gt(500:end, :); dsvo = dsvo(500:end, :); sptam = sptam(500:end, :);
+% gt = gt(500:end, :); dsvo = dsvo(500:end, :); sptam = sptam(500:end, :);
 i = 1; % index of gt
 while(gt(i,1) < dsvo(1,1) || gt(i,1) < sptam(1,1))
     i = i+1;
@@ -25,22 +25,31 @@ sptam_diffn = abs(gtvn - sptamvn);
 Method = {'DSVO'; 'S-PTAM'};
 scale_RMSE = [sqrt(dsvo_diffn' * dsvo_diffn / size(dsvo_diffn,1));sqrt(sptam_diffn' * sptam_diffn / size(sptam_diffn,1))]; 
 scale_Median = [median(dsvo_diffn); median(sptam_diffn)];
-direction_RMSE = [sqrt(dsvo_diffn' * dsvo_diffn / size(dsvo_diffn,1)); sqrt(sptam_diffo' * sptam_diffo / size(sptam_diffo,1))];
-direction_Median = [median(dsvo_diffn); median(sptam_diffo)];
+direction_RMSE = [sqrt(dsvo_diffo' * dsvo_diffo / size(dsvo_diffo,1)); sqrt(sptam_diffo' * sptam_diffo / size(sptam_diffo,1))];
+direction_Median = [median(dsvo_diffo); median(sptam_diffo)];
 time_Mean = [mean(dsvo_t); mean(sptam_t)];
 
 Result = table(Method, scale_RMSE, scale_Median, direction_RMSE, direction_Median, time_Mean);
 disp(Result)
 
-figure('Name','Trajectory')
-plot3(dsvop(:,1), dsvop(:,2), dsvop(:,3), 'g-')
+figure('Name','Trajectory (Top View)')
+plot(dsvop(:,1), dsvop(:,2), 'g-')
 hold on
-plot3(sptamp(:,1), sptamp(:,2), sptamp(:,3), 'b-')
+plot(sptamp(:,1), sptamp(:,2), 'b-')
 hold on
-plot3(gtp(:,1), gtp(:,2), gtp(:,3), 'r-')
-legend('DSVO', 'SPTAM', 'Truth');
+plot(gtp(:,1), gtp(:,2), 'r-')
+xlabel('x [m]');ylabel('y [m]');
+legend('DSVO', 'S-PTAM', 'Truth');
 axis equal
-title('Trajectory')
+view(90,90)
+
+figure('Name', 'Position drift')
+plot(gtt, vecnorm(dsvop'-gtp'), 'g-')
+hold on
+plot(gtt, vecnorm(sptamp'-gtp'), 'b-')
+xlabel('Time [s]'); ylabel('position drift [m]');
+legend('DSVO', 'S-PTAM');
+
 % 
 % disp('DSVO')
 % fprintf('RMSE offset of scale = %f\n', sqrt(dsvo_diffn' * dsvo_diffn / size(dsvo_diffn,1)));
@@ -56,17 +65,17 @@ title('Trajectory')
 
 
 % 
-figure('Name','Velocity')
-% subplot(1,2,1);
-plot(dsvot, dsvovn, 'r-');
-hold on
-plot(sptamt, sptamvn, 'b-');
-hold on
-plot(gtt, gtvn, 'g-');
-ylim([0 min(5,max(max(dsvovn), max(sptamvn))+0.1)]);
-legend('DSVO', 'SPTAM', 'Truth');
-xlabel('Time s'); ylabel('Velocity m/s');
-title('Velocity Scale');
+% figure('Name','Velocity')
+% % subplot(1,2,1);
+% plot(dsvot, dsvovn, 'r-');
+% hold on
+% plot(sptamt, sptamvn, 'b-');
+% hold on
+% plot(gtt, gtvn, 'g-');
+% ylim([0 min(5,max(max(dsvovn), max(sptamvn))+0.1)]);
+% legend('DSVO', 'SPTAM', 'Truth');
+% xlabel('Time s'); ylabel('Velocity m/s');
+% title('Velocity Scale');
 % plot(dsvot, dsvo_diffn, 'g-');
 % hold on
 % plot(sptamt, sptam_diffn, 'b-');
