@@ -1,10 +1,4 @@
 Tasks:
-  change to single thread for testing
-
-  change KF dist to ratio
-
   optimize optimizers
 
   optimize debug mode
-
-  orientation test
