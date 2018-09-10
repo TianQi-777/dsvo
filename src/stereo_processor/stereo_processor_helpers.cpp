@@ -1,5 +1,162 @@
 #include "stereo_processor/stereo_processor.hpp"
 
+bool StereoProcessor::align2D(
+    const cv::Mat& ref_img,
+    const Eigen::Vector3d& ref_px,
+    const Eigen::Vector2d& ref_fx,
+    Eigen::Matrix3d& K,
+    const Eigen::Matrix3d& R_ref2cur,
+    const Eigen::Vector3d& t_ref2cur,
+    const cv::Mat& cur_img,
+    Eigen::Vector2d& cur_fx,
+    const int n_iter)
+{
+  const int halfpatch_size_ = 4;
+  const int patch_size_ = 8;
+  const int patch_area_ = 64;
+
+  // get affine matrix A_cur2ref
+  Eigen::Vector3d cur_fx_ = K*(R_ref2cur*ref_px + t_ref2cur);
+  cur_fx = cur_fx_.head<2>() / cur_fx_[2];
+
+  Eigen::Vector3d ref_px_du = ref_px; ref_px_du(0) += ref_px.z() / K(0,0) * float(halfpatch_size_);
+  Eigen::Vector3d cur_fx_du_ = K*(R_ref2cur*ref_px_du + t_ref2cur);
+  Eigen::Vector2d cur_fx_du = cur_fx_du_.head<2>() / cur_fx_du_(2);
+
+  Eigen::Vector3d ref_px_dv = ref_px; ref_px_dv(1) += ref_px.z() / K(1,1) * float(halfpatch_size_);
+  Eigen::Vector3d cur_fx_dv_ = K*(R_ref2cur*ref_px_dv + t_ref2cur);
+  Eigen::Vector2d cur_fx_dv = cur_fx_dv_.head<2>() / cur_fx_dv_(2);
+
+  // std::cout<<"cur_fx_du "<<cur_fx_du<<std::endl;
+  // std::cout<<"cur_fx_dv "<<cur_fx_dv<<std::endl;
+  // std::cout<<"cur_fx "<<cur_fx<<std::endl;
+  Eigen::Matrix2d A_ref2cur;
+  A_ref2cur.col(0) = (cur_fx_du - cur_fx)/halfpatch_size_;
+  A_ref2cur.col(1) = (cur_fx_dv - cur_fx)/halfpatch_size_;
+  Eigen::Matrix2d A_cur2ref = A_ref2cur.inverse();
+// std::cout<<"A_ref2cur "<<A_ref2cur<<std::endl;
+  // Perform the warp on a larger patch.
+  uint8_t ref_patch_with_border[(patch_size_+2)*(patch_size_+2)] __attribute__ ((aligned (16)));
+  uint8_t* patch_ptr = ref_patch_with_border;
+  for (int y=-1; y<=patch_size_; ++y)
+  {
+    for (int x=-1; x<=patch_size_; ++x, ++patch_ptr)
+    {
+      Eigen::Vector2d px_patch(x-halfpatch_size_, y-halfpatch_size_);
+      Eigen::Vector2d px(A_cur2ref*px_patch + ref_fx);
+      if (px[0]<0 || px[1]<0 || px[0]>=ref_img.cols-1 || px[1]>=ref_img.rows-1)
+        *patch_ptr = 0;
+      else
+        *patch_ptr = (uint8_t) helper::getPixelValue(ref_img, px[0], px[1]);
+    }
+  }
+
+  uint8_t ref_patch[patch_size_*patch_size_] __attribute__ ((aligned (16)));
+  patch_ptr = ref_patch;
+  for (int y=0; y<patch_size_; ++y)
+  {
+    for (int x=0; x<patch_size_; ++x, ++patch_ptr)
+    {
+      Eigen::Vector2d px_patch(x-halfpatch_size_, y-halfpatch_size_);
+      Eigen::Vector2d px(A_cur2ref*px_patch + ref_fx);
+      if (px[0]<0 || px[1]<0 || px[0]>=ref_img.cols-1 || px[1]>=ref_img.rows-1)
+        *patch_ptr = 0;
+      else
+        *patch_ptr = (uint8_t) helper::getPixelValue(ref_img, px[0], px[1]);
+    }
+  }
+
+  // compute derivative of template and prepare inverse compositional
+  float __attribute__((__aligned__(16))) ref_patch_dx[patch_area_];
+  float __attribute__((__aligned__(16))) ref_patch_dy[patch_area_];
+  Eigen::Matrix3f H; H.setZero();
+
+  // compute gradient and hessian
+  const int ref_step = patch_size_+2;
+  float* it_dx = ref_patch_dx;
+  float* it_dy = ref_patch_dy;
+  for(int y=0; y<patch_size_; ++y)
+  {
+    uint8_t* it = ref_patch_with_border + (y+1)*ref_step + 1;
+    for(int x=0; x<patch_size_; ++x, ++it, ++it_dx, ++it_dy)
+    {
+      Eigen::Vector3f J;
+      J[0] = 0.5 * (it[1] - it[-1]);
+      J[1] = 0.5 * (it[ref_step] - it[-ref_step]);
+      J[2] = 1;
+      *it_dx = J[0];
+      *it_dy = J[1];
+      H += J*J.transpose();
+    }
+  }
+  Eigen::Matrix3f Hinv = H.inverse();
+  float mean_diff = 0;
+
+  // Compute pixel location in new image:
+  float u = cur_fx.x();
+  float v = cur_fx.y();
+
+  // termination condition
+  const float min_update_squared = 0.03*0.03;
+  const int cur_step = cur_img.step.p[0];
+//  float chi2 = 0;
+  Eigen::Vector3f update; update.setZero();
+  bool converged=false;
+  for(int iter = 0; iter<n_iter; ++iter)
+  {
+    int u_r = floor(u);
+    int v_r = floor(v);
+    if(u_r < halfpatch_size_ || v_r < halfpatch_size_ || u_r >= cur_img.cols-halfpatch_size_ || v_r >= cur_img.rows-halfpatch_size_)
+      break;
+
+    if(isnan(u) || isnan(v)) // TODO very rarely this can happen, maybe H is singular? should not be at corner.. check
+      return false;
+
+    // compute interpolation weights
+    float subpix_x = u-u_r;
+    float subpix_y = v-v_r;
+    float wTL = (1.0-subpix_x)*(1.0-subpix_y);
+    float wTR = subpix_x * (1.0-subpix_y);
+    float wBL = (1.0-subpix_x)*subpix_y;
+    float wBR = subpix_x * subpix_y;
+
+    // loop through search_patch, interpolate
+    uint8_t* it_ref = ref_patch;
+    float* it_ref_dx = ref_patch_dx;
+    float* it_ref_dy = ref_patch_dy;
+//    float new_chi2 = 0.0;
+    Eigen::Vector3f Jres; Jres.setZero();
+    for(int y=0; y<patch_size_; ++y)
+    {
+      uint8_t* it = (uint8_t*) cur_img.data + (v_r+y-halfpatch_size_)*cur_step + u_r-halfpatch_size_;
+      for(int x=0; x<patch_size_; ++x, ++it, ++it_ref, ++it_ref_dx, ++it_ref_dy)
+      {
+        float search_pixel = wTL*it[0] + wTR*it[1] + wBL*it[cur_step] + wBR*it[cur_step+1];
+        float res = search_pixel - *it_ref + mean_diff;
+        Jres[0] -= res*(*it_ref_dx);
+        Jres[1] -= res*(*it_ref_dy);
+        Jres[2] -= res;
+//        new_chi2 += res*res;
+      }
+    }
+
+    update = Hinv * Jres;
+    u += update[0];
+    v += update[1];
+    mean_diff += update[2];
+
+    if(update[0]*update[0]+update[1]*update[1] < min_update_squared)
+    {
+      converged=true;
+      break;
+    }
+  }
+  std::cout<<"cur_fx before ["<<cur_fx.x()<<" , "<<cur_fx.y()<<" ]"<<std::endl;
+  cur_fx << u, v;
+  std::cout<<"cur_fx after ["<<cur_fx.x()<<" , "<<cur_fx.y()<<" ]"<<std::endl;
+  return converged;
+}
+
 void StereoProcessor::updateConfig(dsvo::dsvoConfig &config, uint32_t level) {
 	BLUR_SZ = 2*config.BLUR_SZ+1;
 	BLUR_VAR = config.BLUR_VAR;

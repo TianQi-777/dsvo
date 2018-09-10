@@ -128,6 +128,17 @@ private:
 	std::thread thread_featureTrack;
 	void featureTrackThread();
 
+	bool align2D(
+	    const cv::Mat& ref_img,
+	    const Eigen::Vector3d& ref_px,
+	    const Eigen::Vector2d& ref_fx,
+	    Eigen::Matrix3d& K,
+	    const Eigen::Matrix3d& R_ref2cur,
+	    const Eigen::Vector3d& t_ref2cur,
+	    const cv::Mat& cur_img,
+	    Eigen::Vector2d& cur_fx,
+	    const int n_iter);
+
 public:
 	StereoProcessor();
 	~StereoProcessor();

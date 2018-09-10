@@ -28,9 +28,9 @@ Result = table(Method, scale_RMSE, scale_Median, direction_RMSE, direction_Media
 disp(Result)
 
 figure('Name','Trajectory (Top View)')
-plot(dsvop(:,1), dsvop(:,2), 'g-')
+plot3(dsvop(:,1), dsvop(:,2), dsvop(:,3), 'g-')
 hold on
-plot(gtp(:,1), gtp(:,2), 'r-')
+plot3(gtp(:,1), gtp(:,2), gtp(:,3), 'r-')
 xlabel('x [m]');ylabel('y [m]');
 legend('DSVO', 'Truth');
 axis equal

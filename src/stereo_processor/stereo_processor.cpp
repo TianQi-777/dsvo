@@ -186,6 +186,8 @@ bool StereoProcessor::propagateState() {
 	/******************************************calculate pose by direct method******************************************/
 	double dist = pose_estimater.poseEstimate(last_frame.feature_points, last_frame.img, cam0.K, cur_img0, PROP_PYMD, PROP_MAX_STEP, R_last_frame, t_last_frame);
 	time_ofs << "121 " << cur_time-init_time << " " << (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " -1" << std::endl;
+	Eigen::Matrix3d R_lastKF = R_last_frame * last_frame.pose_from_lastKF.orientation.toRotationMatrix();
+	Eigen::Vector3d t_lastKF = R_last_frame * last_frame.pose_from_lastKF.position + t_last_frame;
 	/******************************************calculate pose by direct method******************************************/
 
 	/******************************************find feature correspondences by optical flow******************************************/
@@ -196,27 +198,32 @@ bool StereoProcessor::propagateState() {
 	cv::Rodrigues(R_cv, r_cv);
 	std::vector<cv::Point2f> cur_features, cur_features_refined;
   cv::projectPoints(last_frame.feature_points.points(), r_cv, t_cv, cam0.K, cv::Mat::zeros(1,4,CV_64F), cur_features);
-	cur_features_refined = cur_features;
-  std::vector<uchar> status;
-  std::vector<float> err;
-	cv::calcOpticalFlowPyrLK(last_frame.img, cur_img0, last_frame.feature_points.features(), cur_features_refined, status, err, cv::Size(OF_size,OF_size), PROP_PYMD,
-													 cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
+	// cur_features_refined = cur_features;
+  // std::vector<uchar> status;
+  // std::vector<float> err;
+	// // cv::calcOpticalFlowPyrLK(last_frame.img, cur_img0, last_frame.feature_points.features(), cur_features_refined, status, err, cv::Size(OF_size,OF_size), PROP_PYMD,
+	// 												 // cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
 
 
 	// remove point outliers
 	std::vector<cv::Point2f> lastKF_features_inlier, cur_features_refined_inlier;
   PointsWithUncertainties lastKF_points_inlier;
-  for(int i=0; i<status.size(); i++){
-		if(!status[i]) continue;
+  for(int i=0; i<lastKF->feature_points.size(); i++){
+		Eigen::Vector2d cur_fx;
+		Eigen::Vector3d ref_px (lastKF->feature_points.points()[i].x, lastKF->feature_points.points()[i].y, lastKF->feature_points.points()[i].z);
+		Eigen::Vector2d ref_fx (lastKF->feature_points.features()[i].x, lastKF->feature_points.features()[i].y);
+		Eigen::Matrix3d K;
+		cv::cv2eigen(cam0.K, K);
+		if(!align2D(lastKF->img0, ref_px, ref_fx, K, R_lastKF, t_lastKF, cur_img0, cur_fx, 30)) continue;
 
-		cur_features_refined_inlier.push_back(cur_features_refined[i]);
+		cur_features_refined_inlier.push_back(cv::Point2f(cur_fx.x(), cur_fx.y()));
 		lastKF_features_inlier.push_back(lastKF->feature_points[i].feature);
-		lastKF_points_inlier.push_back(lastKF->feature_points[i].point.point, cv::norm(cur_features[i] - cur_features_refined[i]));	//TODO
+		lastKF_points_inlier.push_back(lastKF->feature_points[i].point.point, cv::norm(cur_features[i] - cv::Point2f(cur_fx.x(), cur_fx.y())));	//TODO
   }
-	if(DEBUG) std::cout<<"propagate refine: "<<last_frame.feature_points.size()<<" -> "<<lastKF_points_inlier.size()<<std::endl;
+	if(DEBUG) std::cout<<"propagate refine: "<<lastKF->feature_points.size()<<" -> "<<lastKF_points_inlier.size()<<std::endl;
 
-	if(float(lastKF_points_inlier.size()) / last_frame.feature_points.size() < PROP_PTS_RATIO){
-		std::cout<<"propagateState refine ratio too low: "<<float(lastKF_points_inlier.size()) / last_frame.feature_points.size()<<std::endl;
+	if(float(lastKF_points_inlier.size()) / lastKF->feature_points.size() < PROP_PTS_RATIO){
+		std::cout<<"propagateState refine ratio too low: "<<float(lastKF_points_inlier.size()) / lastKF->feature_points.size()<<std::endl;
 		R_last_frame = Eigen::Matrix3d::Identity();
 		t_last_frame = Eigen::Vector3d::Zero();
 		last_frame.feature_points.clear();
@@ -226,8 +233,6 @@ bool StereoProcessor::propagateState() {
 	/******************************************find feature correspondences by optical flow******************************************/
 
 	/******************************************refine pose******************************************/
-	Eigen::Matrix3d R_lastKF = R_last_frame * last_frame.pose_from_lastKF.orientation.toRotationMatrix();
-	Eigen::Vector3d t_lastKF = R_last_frame * last_frame.pose_from_lastKF.position + t_last_frame;
 	if(DEBUG) {
 		cv::Mat test = cur_img0.clone();
 		helper::project3DPtsToImg(lastKF_points_inlier.points(), cam0.K, R_lastKF, t_lastKF, test);
